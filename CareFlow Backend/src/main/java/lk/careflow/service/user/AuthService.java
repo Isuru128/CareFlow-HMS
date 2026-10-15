@@ -2,7 +2,6 @@ package lk.careflow.service.user;
 
 import jakarta.servlet.http.HttpServletRequest;
 import lk.careflow.config.JwtUtils;
-import lk.careflow.config.UserDetailsImpl;
 import lk.careflow.dto.user.*;
 import lk.careflow.entity.user.PasswordResetToken;
 import lk.careflow.entity.user.RefreshToken;
@@ -60,7 +59,7 @@ public class AuthService {
 
             SecurityContextHolder.getContext().setAuthentication(authentication);
 
-            UserDetailsImpl userDetails = (UserDetailsImpl) authentication.getPrincipal();
+            User userDetails = (User) authentication.getPrincipal();
             String jwt = jwtUtils.generateJwtToken(authentication);
 
             RefreshToken refreshToken = refreshTokenService.createRefreshToken(userDetails.getId());

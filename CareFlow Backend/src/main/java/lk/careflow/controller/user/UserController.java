@@ -2,11 +2,11 @@ package lk.careflow.controller.user;
 
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
-import lk.careflow.config.UserDetailsImpl;
 import lk.careflow.dto.user.CreateUserRequest;
 import lk.careflow.dto.user.MessageResponse;
 import lk.careflow.dto.user.UpdateUserRequest;
 import lk.careflow.dto.user.UserResponse;
+import lk.careflow.entity.user.User;
 import lk.careflow.entity.user.UserStatus;
 import lk.careflow.service.user.UserService;
 import lombok.RequiredArgsConstructor;
@@ -41,7 +41,7 @@ public class UserController {
 
     @GetMapping("/profile/me")
     @PreAuthorize("isAuthenticated()")
-    public ResponseEntity<UserResponse> getCurrentUser(@AuthenticationPrincipal UserDetailsImpl userDetails) {
+    public ResponseEntity<UserResponse> getCurrentUser(@AuthenticationPrincipal User userDetails) {
         return ResponseEntity.ok(userService.getUserById(userDetails.getId()));
     }
 
