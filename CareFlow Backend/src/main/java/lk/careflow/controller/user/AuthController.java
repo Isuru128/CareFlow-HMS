@@ -2,8 +2,8 @@ package lk.careflow.controller.user;
 
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
-import lk.careflow.config.UserDetailsImpl;
 import lk.careflow.dto.user.*;
+import lk.careflow.entity.user.User;
 import lk.careflow.service.user.AuthService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
@@ -53,7 +53,7 @@ public class AuthController {
     @PostMapping("/change-password")
     @PreAuthorize("isAuthenticated()")
     public ResponseEntity<MessageResponse> changePassword(
-            @AuthenticationPrincipal UserDetailsImpl userDetails,
+            @AuthenticationPrincipal User userDetails,
             @Valid @RequestBody ChangePasswordRequest request,
             HttpServletRequest httpRequest) {
         authService.changePassword(userDetails.getId(), request, httpRequest);
