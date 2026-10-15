@@ -4,14 +4,12 @@ import jakarta.servlet.http.HttpServletRequest;
 import lk.careflow.dto.user.CreateUserRequest;
 import lk.careflow.dto.user.UpdateUserRequest;
 import lk.careflow.dto.user.UserResponse;
-import lk.careflow.entity.user.ERole;
 import lk.careflow.entity.user.Role;
 import lk.careflow.entity.user.User;
 import lk.careflow.entity.user.UserStatus;
 import lk.careflow.exception.BadRequestException;
 import lk.careflow.exception.ResourceNotFoundException;
 import lk.careflow.exception.user.UserAlreadyExistsException;
-import lk.careflow.repository.user.RoleRepository;
 import lk.careflow.repository.user.UserRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
@@ -29,7 +27,6 @@ import java.util.stream.Collectors;
 public class UserService {
 
     private final UserRepository userRepository;
-    private final RoleRepository roleRepository;
     private final PasswordEncoder passwordEncoder;
     private final AuditLogService auditLogService;
 
@@ -64,15 +61,15 @@ public class UserService {
 
         Set<Role> roles = new HashSet<>();
         if (request.getRoles() == null || request.getRoles().isEmpty()) {
-            Role receptionistRole = roleRepository.findByName(ERole.ROLE_RECEPTIONIST)
-                    .orElseThrow(() -> new ResourceNotFoundException("Role", "name", ERole.ROLE_RECEPTIONIST));
-            roles.add(receptionistRole);
+            roles.add(Role.ROLE_RECEPTIONIST);
         } else {
             request.getRoles().forEach(roleStr -> {
-                String normalized = roleStr.startsWith("ROLE_") ? roleStr : "ROLE_" + roleStr.toUpperCase();
-                Role role = roleRepository.findByName(ERole.valueOf(normalized))
-                        .orElseThrow(() -> new ResourceNotFoundException("Role", "name", roleStr));
-                roles.add(role);
+                String normalized = roleStr.startsWith("ROLE_") ? roleStr.toUpperCase() : "ROLE_" + roleStr.toUpperCase();
+                try {
+                    roles.add(Role.valueOf(normalized));
+                } catch (IllegalArgumentException e) {
+                    throw new ResourceNotFoundException("Role", "name", roleStr);
+                }
             });
         }
 
@@ -115,10 +112,12 @@ public class UserService {
         if (request.getRoles() != null && !request.getRoles().isEmpty()) {
             Set<Role> roles = new HashSet<>();
             request.getRoles().forEach(roleStr -> {
-                String normalized = roleStr.startsWith("ROLE_") ? roleStr : "ROLE_" + roleStr.toUpperCase();
-                Role role = roleRepository.findByName(ERole.valueOf(normalized))
-                        .orElseThrow(() -> new ResourceNotFoundException("Role", "name", roleStr));
-                roles.add(role);
+                String normalized = roleStr.startsWith("ROLE_") ? roleStr.toUpperCase() : "ROLE_" + roleStr.toUpperCase();
+                try {
+                    roles.add(Role.valueOf(normalized));
+                } catch (IllegalArgumentException e) {
+                    throw new ResourceNotFoundException("Role", "name", roleStr);
+                }
             });
             user.setRoles(roles);
         }
@@ -160,7 +159,7 @@ public class UserService {
 
     public UserResponse mapToUserResponse(User user) {
         Set<String> roleNames = user.getRoles().stream()
-                .map(role -> role.getName().name())
+                .map(Role::name)
                 .collect(Collectors.toSet());
 
         return UserResponse.builder()
