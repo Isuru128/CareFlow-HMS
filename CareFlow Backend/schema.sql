@@ -149,3 +149,125 @@ SELECT u.id, 'ROLE_ADMIN'
 FROM users u
 WHERE u.username = 'admin'
 ON CONFLICT (user_id, role) DO NOTHING;
+
+-- ==============================================================================
+-- Module 3.2 - Patient Management
+-- ==============================================================================
+
+-- ------------------------------------------------------------------------------
+-- 6. PATIENTS TABLE
+-- Stores demographic, contact, emergency, and medical baseline information.
+-- ------------------------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS patients (
+    id BIGSERIAL PRIMARY KEY,
+    patient_number VARCHAR(30) NOT NULL UNIQUE,
+    first_name VARCHAR(50) NOT NULL,
+    last_name VARCHAR(50) NOT NULL,
+    date_of_birth DATE NOT NULL,
+    gender VARCHAR(20) NOT NULL CHECK (gender IN ('MALE', 'FEMALE', 'OTHER')),
+    blood_group VARCHAR(10) CHECK (blood_group IN ('A+', 'A-', 'B+', 'B-', 'AB+', 'AB-', 'O+', 'O-')),
+    contact_number VARCHAR(20) NOT NULL,
+    email VARCHAR(100),
+    nic_or_passport VARCHAR(50),
+    address TEXT,
+    emergency_contact_name VARCHAR(100),
+    emergency_contact_number VARCHAR(20),
+    emergency_contact_relation VARCHAR(50),
+    allergies TEXT,
+    status VARCHAR(20) NOT NULL DEFAULT 'ACTIVE' CHECK (status IN ('ACTIVE', 'INACTIVE', 'DECEASED')),
+    registered_by BIGINT REFERENCES users(id) ON DELETE SET NULL,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+
+-- ------------------------------------------------------------------------------
+-- 7. PATIENT MEDICAL HISTORY TABLE
+-- Records diagnosed medical conditions, treatments, past surgeries, and notes.
+-- ------------------------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS patient_medical_history (
+    id BIGSERIAL PRIMARY KEY,
+    patient_id BIGINT NOT NULL REFERENCES patients(id) ON DELETE CASCADE,
+    condition_or_diagnosis VARCHAR(255) NOT NULL,
+    diagnosis_date DATE,
+    treatment TEXT,
+    surgeries TEXT,
+    medications TEXT,
+    notes TEXT,
+    recorded_by BIGINT REFERENCES users(id) ON DELETE SET NULL,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+
+-- ------------------------------------------------------------------------------
+-- 8. PATIENT DOCUMENTS TABLE
+-- Stores metadata and storage references for uploaded patient documents
+-- (e.g. lab reports, medical scans, discharge summaries, identification).
+-- ------------------------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS patient_documents (
+    id BIGSERIAL PRIMARY KEY,
+    patient_id BIGINT NOT NULL REFERENCES patients(id) ON DELETE CASCADE,
+    document_name VARCHAR(255) NOT NULL,
+    document_type VARCHAR(100) NOT NULL CHECK (
+        document_type IN ('LAB_REPORT', 'SCAN', 'PRESCRIPTION', 'DISCHARGE_SUMMARY', 'ID_PROOF', 'OTHER')
+    ),
+    file_name VARCHAR(255) NOT NULL,
+    file_url VARCHAR(512) NOT NULL,
+    file_type VARCHAR(100),
+    file_size BIGINT,
+    notes TEXT,
+    uploaded_by BIGINT REFERENCES users(id) ON DELETE SET NULL,
+    uploaded_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+
+-- ------------------------------------------------------------------------------
+-- INDEXES FOR PATIENT MANAGEMENT
+-- ------------------------------------------------------------------------------
+CREATE INDEX IF NOT EXISTS idx_patients_patient_number ON patients(patient_number);
+CREATE INDEX IF NOT EXISTS idx_patients_first_name ON patients(first_name);
+CREATE INDEX IF NOT EXISTS idx_patients_last_name ON patients(last_name);
+CREATE INDEX IF NOT EXISTS idx_patients_contact_number ON patients(contact_number);
+CREATE INDEX IF NOT EXISTS idx_patients_nic_or_passport ON patients(nic_or_passport);
+CREATE INDEX IF NOT EXISTS idx_patients_status ON patients(status);
+CREATE INDEX IF NOT EXISTS idx_patients_created_at ON patients(created_at);
+
+CREATE INDEX IF NOT EXISTS idx_patient_medical_history_patient_id ON patient_medical_history(patient_id);
+CREATE INDEX IF NOT EXISTS idx_patient_documents_patient_id ON patient_documents(patient_id);
+
+-- ------------------------------------------------------------------------------
+-- TRIGGERS FOR PATIENTS & MEDICAL HISTORY TIMESTAMP UPDATE
+-- ------------------------------------------------------------------------------
+DROP TRIGGER IF EXISTS trg_update_patients_timestamp ON patients;
+CREATE TRIGGER trg_update_patients_timestamp
+BEFORE UPDATE ON patients
+FOR EACH ROW
+EXECUTE FUNCTION update_timestamp_column();
+
+DROP TRIGGER IF EXISTS trg_update_patient_medical_history_timestamp ON patient_medical_history;
+CREATE TRIGGER trg_update_patient_medical_history_timestamp
+BEFORE UPDATE ON patient_medical_history
+FOR EACH ROW
+EXECUTE FUNCTION update_timestamp_column();
+
+-- ------------------------------------------------------------------------------
+-- SEED DATA: Sample Patient
+-- ------------------------------------------------------------------------------
+INSERT INTO patients (patient_number, first_name, last_name, date_of_birth, gender, blood_group, contact_number, email, nic_or_passport, address, emergency_contact_name, emergency_contact_number, emergency_contact_relation, allergies, status)
+VALUES (
+    'PAT-10001',
+    'John',
+    'Doe',
+    '1985-05-15',
+    'MALE',
+    'O+',
+    '+94711234567',
+    'johndoe@example.com',
+    '198512345678',
+    '123 Galle Road, Colombo 03, Sri Lanka',
+    'Jane Doe',
+    '+94719876543',
+    'Spouse',
+    'Penicillin',
+    'ACTIVE'
+)
+ON CONFLICT (patient_number) DO NOTHING;
+
