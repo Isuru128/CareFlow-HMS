@@ -8,21 +8,7 @@
 CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
 
 -- ------------------------------------------------------------------------------
--- 1. ROLES TABLE
--- Represents user access roles specified in HMS System Overview (Administrator,
--- Doctors, Nurses, Receptionists, Laboratory Staff, Pharmacists, Accountants).
--- ------------------------------------------------------------------------------
-CREATE TABLE IF NOT EXISTS roles (
-    id SERIAL PRIMARY KEY,
-    name VARCHAR(50) NOT NULL UNIQUE,
-    display_name VARCHAR(100) NOT NULL,
-    description TEXT,
-    created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    updated_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP
-);
-
--- ------------------------------------------------------------------------------
--- 2. USERS TABLE
+-- 1. USERS TABLE
 -- Core user entity storing authentication credentials, personal profile,
 -- security status, and login audit tracking.
 -- ------------------------------------------------------------------------------
@@ -44,18 +30,28 @@ CREATE TABLE IF NOT EXISTS users (
 );
 
 -- ------------------------------------------------------------------------------
--- 3. USER ROLES JUNCTION TABLE (RBAC)
--- Maps users to their designated roles, supporting role-based access control.
+-- 2. USER ROLES TABLE
+-- Maps users to their designated roles (Enum-based RBAC)
 -- ------------------------------------------------------------------------------
 CREATE TABLE IF NOT EXISTS user_roles (
     user_id BIGINT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-    role_id INT NOT NULL REFERENCES roles(id) ON DELETE CASCADE,
+    role VARCHAR(50) NOT NULL CHECK (
+        role IN (
+            'ROLE_ADMIN',
+            'ROLE_DOCTOR',
+            'ROLE_NURSE',
+            'ROLE_RECEPTIONIST',
+            'ROLE_LABORATORY_STAFF',
+            'ROLE_PHARMACIST',
+            'ROLE_ACCOUNTANT'
+        )
+    ),
     assigned_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    PRIMARY KEY (user_id, role_id)
+    PRIMARY KEY (user_id, role)
 );
 
 -- ------------------------------------------------------------------------------
--- 4. REFRESH TOKENS TABLE
+-- 3. REFRESH TOKENS TABLE
 -- Facilitates secure login, token rotation, logout revocation, and session timeouts.
 -- ------------------------------------------------------------------------------
 CREATE TABLE IF NOT EXISTS refresh_tokens (
@@ -68,8 +64,8 @@ CREATE TABLE IF NOT EXISTS refresh_tokens (
 );
 
 -- ------------------------------------------------------------------------------
--- 5. PASSWORD RESET TOKENS TABLE
--- Manages secure password recovery workflows with expiration and single-use checks.
+-- 4. PASSWORD RESET TOKENS TABLE
+-- Stores single-use, time-limited cryptographic tokens for password reset workflows.
 -- ------------------------------------------------------------------------------
 CREATE TABLE IF NOT EXISTS password_reset_tokens (
     id BIGSERIAL PRIMARY KEY,
@@ -81,8 +77,8 @@ CREATE TABLE IF NOT EXISTS password_reset_tokens (
 );
 
 -- ------------------------------------------------------------------------------
--- 6. AUDIT LOGS TABLE
--- Tracks security events: logins, logouts, password updates, and administrative actions.
+-- 5. AUDIT LOGS TABLE
+-- Maintains immutable logs of all security actions, role assignments, and profile edits.
 -- ------------------------------------------------------------------------------
 CREATE TABLE IF NOT EXISTS audit_logs (
     id BIGSERIAL PRIMARY KEY,
@@ -97,23 +93,27 @@ CREATE TABLE IF NOT EXISTS audit_logs (
 );
 
 -- ------------------------------------------------------------------------------
--- INDEXES FOR PERFORMANCE OPTIMIZATION
+-- INDEXES FOR QUERY OPTIMIZATION
 -- ------------------------------------------------------------------------------
 CREATE INDEX IF NOT EXISTS idx_users_username ON users(username);
 CREATE INDEX IF NOT EXISTS idx_users_email ON users(email);
 CREATE INDEX IF NOT EXISTS idx_users_status ON users(status);
+
 CREATE INDEX IF NOT EXISTS idx_user_roles_user_id ON user_roles(user_id);
-CREATE INDEX IF NOT EXISTS idx_user_roles_role_id ON user_roles(role_id);
+CREATE INDEX IF NOT EXISTS idx_user_roles_role ON user_roles(role);
+
 CREATE INDEX IF NOT EXISTS idx_refresh_tokens_user_id ON refresh_tokens(user_id);
 CREATE INDEX IF NOT EXISTS idx_refresh_tokens_token ON refresh_tokens(token);
+
 CREATE INDEX IF NOT EXISTS idx_password_reset_tokens_user_id ON password_reset_tokens(user_id);
 CREATE INDEX IF NOT EXISTS idx_password_reset_tokens_token_hash ON password_reset_tokens(token_hash);
+
 CREATE INDEX IF NOT EXISTS idx_audit_logs_user_id ON audit_logs(user_id);
 CREATE INDEX IF NOT EXISTS idx_audit_logs_action ON audit_logs(action);
 CREATE INDEX IF NOT EXISTS idx_audit_logs_created_at ON audit_logs(created_at);
 
 -- ------------------------------------------------------------------------------
--- AUTO-UPDATE TRIGGER FUNCTION FOR updated_at COLUMNS
+-- AUTOMATIC TIMESTAMP UPDATE TRIGGER
 -- ------------------------------------------------------------------------------
 CREATE OR REPLACE FUNCTION update_timestamp_column()
 RETURNS TRIGGER AS $$
@@ -123,12 +123,6 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql;
 
-DROP TRIGGER IF EXISTS trg_update_roles_timestamp ON roles;
-CREATE TRIGGER trg_update_roles_timestamp
-BEFORE UPDATE ON roles
-FOR EACH ROW
-EXECUTE FUNCTION update_timestamp_column();
-
 DROP TRIGGER IF EXISTS trg_update_users_timestamp ON users;
 CREATE TRIGGER trg_update_users_timestamp
 BEFORE UPDATE ON users
@@ -136,30 +130,13 @@ FOR EACH ROW
 EXECUTE FUNCTION update_timestamp_column();
 
 -- ------------------------------------------------------------------------------
--- SEED DATA: HMS System Roles (From Specification Section 2)
--- ------------------------------------------------------------------------------
-INSERT INTO roles (name, display_name, description) VALUES
-    ('ROLE_ADMIN', 'Administrator', 'Full system access and user administration privileges'),
-    ('ROLE_DOCTOR', 'Doctor', 'Access to patient consultation, prescriptions, and medical history'),
-    ('ROLE_NURSE', 'Nurse', 'Access to patient vitals, admissions, and inpatient care'),
-    ('ROLE_RECEPTIONIST', 'Receptionist', 'Access to patient registration and appointment scheduling'),
-    ('ROLE_LABORATORY_STAFF', 'Laboratory Staff', 'Access to lab test requests, sample collection, and results'),
-    ('ROLE_PHARMACIST', 'Pharmacist', 'Access to pharmacy inventory, stock, and prescription dispensing'),
-    ('ROLE_ACCOUNTANT', 'Accountant', 'Access to billing, invoice generation, and payment recording')
-ON CONFLICT (name) DO NOTHING;
-
--- ------------------------------------------------------------------------------
--- SEED DATA: Default System Administrator
--- Default credentials:
--- Username: admin
--- Email: admin@careflow.lk
--- Password: Admin@123 (BCrypt hash with 10 rounds: $2a$10$wVq3xZc7tI3E25U8t6hYt.O5KjW0y4F2w2eW0z7Vp1U2I3o4K5L6e)
+-- SEED DATA: Default Administrator (Credentials: admin / Admin@123)
 -- ------------------------------------------------------------------------------
 INSERT INTO users (username, email, password_hash, first_name, last_name, phone_number, status)
 VALUES (
     'admin',
     'admin@careflow.lk',
-    '$2a$10$WqTfv3Cq1w9UjUv2QpC1tO51h9b8EfZlYJ5eI4e6Zf8gT5qH4e1mS', -- BCrypt hash for Admin@123
+    '$2a$10$LE7k63jl5YklWQ7Xfw7X6.zxPImenU.SrTO.YfYcw7SRy.3lmh.We',
     'System',
     'Administrator',
     '+94770000000',
@@ -167,9 +144,130 @@ VALUES (
 )
 ON CONFLICT (username) DO NOTHING;
 
--- Assign ROLE_ADMIN to default admin user
-INSERT INTO user_roles (user_id, role_id)
-SELECT u.id, r.id
-FROM users u, roles r
-WHERE u.username = 'admin' AND r.name = 'ROLE_ADMIN'
-ON CONFLICT (user_id, role_id) DO NOTHING;
+INSERT INTO user_roles (user_id, role)
+SELECT u.id, 'ROLE_ADMIN'
+FROM users u
+WHERE u.username = 'admin'
+ON CONFLICT (user_id, role) DO NOTHING;
+
+-- ==============================================================================
+-- Module 3.2 - Patient Management
+-- ==============================================================================
+
+-- ------------------------------------------------------------------------------
+-- 6. PATIENTS TABLE
+-- Stores demographic, contact, emergency, and medical baseline information.
+-- ------------------------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS patients (
+    id BIGSERIAL PRIMARY KEY,
+    patient_number VARCHAR(30) NOT NULL UNIQUE,
+    first_name VARCHAR(50) NOT NULL,
+    last_name VARCHAR(50) NOT NULL,
+    date_of_birth DATE NOT NULL,
+    gender VARCHAR(20) NOT NULL CHECK (gender IN ('MALE', 'FEMALE', 'OTHER')),
+    blood_group VARCHAR(10) CHECK (blood_group IN ('A+', 'A-', 'B+', 'B-', 'AB+', 'AB-', 'O+', 'O-')),
+    contact_number VARCHAR(20) NOT NULL,
+    email VARCHAR(100),
+    nic_or_passport VARCHAR(50),
+    address TEXT,
+    emergency_contact_name VARCHAR(100),
+    emergency_contact_number VARCHAR(20),
+    emergency_contact_relation VARCHAR(50),
+    allergies TEXT,
+    status VARCHAR(20) NOT NULL DEFAULT 'ACTIVE' CHECK (status IN ('ACTIVE', 'INACTIVE', 'DECEASED')),
+    registered_by BIGINT REFERENCES users(id) ON DELETE SET NULL,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+
+-- ------------------------------------------------------------------------------
+-- 7. PATIENT MEDICAL HISTORY TABLE
+-- Records diagnosed medical conditions, treatments, past surgeries, and notes.
+-- ------------------------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS patient_medical_history (
+    id BIGSERIAL PRIMARY KEY,
+    patient_id BIGINT NOT NULL REFERENCES patients(id) ON DELETE CASCADE,
+    condition_or_diagnosis VARCHAR(255) NOT NULL,
+    diagnosis_date DATE,
+    treatment TEXT,
+    surgeries TEXT,
+    medications TEXT,
+    notes TEXT,
+    recorded_by BIGINT REFERENCES users(id) ON DELETE SET NULL,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+
+-- ------------------------------------------------------------------------------
+-- 8. PATIENT DOCUMENTS TABLE
+-- Stores metadata and storage references for uploaded patient documents
+-- (e.g. lab reports, medical scans, discharge summaries, identification).
+-- ------------------------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS patient_documents (
+    id BIGSERIAL PRIMARY KEY,
+    patient_id BIGINT NOT NULL REFERENCES patients(id) ON DELETE CASCADE,
+    document_name VARCHAR(255) NOT NULL,
+    document_type VARCHAR(100) NOT NULL CHECK (
+        document_type IN ('LAB_REPORT', 'SCAN', 'PRESCRIPTION', 'DISCHARGE_SUMMARY', 'ID_PROOF', 'OTHER')
+    ),
+    file_name VARCHAR(255) NOT NULL,
+    file_url VARCHAR(512) NOT NULL,
+    file_type VARCHAR(100),
+    file_size BIGINT,
+    notes TEXT,
+    uploaded_by BIGINT REFERENCES users(id) ON DELETE SET NULL,
+    uploaded_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+
+-- ------------------------------------------------------------------------------
+-- INDEXES FOR PATIENT MANAGEMENT
+-- ------------------------------------------------------------------------------
+CREATE INDEX IF NOT EXISTS idx_patients_patient_number ON patients(patient_number);
+CREATE INDEX IF NOT EXISTS idx_patients_first_name ON patients(first_name);
+CREATE INDEX IF NOT EXISTS idx_patients_last_name ON patients(last_name);
+CREATE INDEX IF NOT EXISTS idx_patients_contact_number ON patients(contact_number);
+CREATE INDEX IF NOT EXISTS idx_patients_nic_or_passport ON patients(nic_or_passport);
+CREATE INDEX IF NOT EXISTS idx_patients_status ON patients(status);
+CREATE INDEX IF NOT EXISTS idx_patients_created_at ON patients(created_at);
+
+CREATE INDEX IF NOT EXISTS idx_patient_medical_history_patient_id ON patient_medical_history(patient_id);
+CREATE INDEX IF NOT EXISTS idx_patient_documents_patient_id ON patient_documents(patient_id);
+
+-- ------------------------------------------------------------------------------
+-- TRIGGERS FOR PATIENTS & MEDICAL HISTORY TIMESTAMP UPDATE
+-- ------------------------------------------------------------------------------
+DROP TRIGGER IF EXISTS trg_update_patients_timestamp ON patients;
+CREATE TRIGGER trg_update_patients_timestamp
+BEFORE UPDATE ON patients
+FOR EACH ROW
+EXECUTE FUNCTION update_timestamp_column();
+
+DROP TRIGGER IF EXISTS trg_update_patient_medical_history_timestamp ON patient_medical_history;
+CREATE TRIGGER trg_update_patient_medical_history_timestamp
+BEFORE UPDATE ON patient_medical_history
+FOR EACH ROW
+EXECUTE FUNCTION update_timestamp_column();
+
+-- ------------------------------------------------------------------------------
+-- SEED DATA: Sample Patient
+-- ------------------------------------------------------------------------------
+INSERT INTO patients (patient_number, first_name, last_name, date_of_birth, gender, blood_group, contact_number, email, nic_or_passport, address, emergency_contact_name, emergency_contact_number, emergency_contact_relation, allergies, status)
+VALUES (
+    'PAT-10001',
+    'John',
+    'Doe',
+    '1985-05-15',
+    'MALE',
+    'O+',
+    '+94711234567',
+    'johndoe@example.com',
+    '198512345678',
+    '123 Galle Road, Colombo 03, Sri Lanka',
+    'Jane Doe',
+    '+94719876543',
+    'Spouse',
+    'Penicillin',
+    'ACTIVE'
+)
+ON CONFLICT (patient_number) DO NOTHING;
+
