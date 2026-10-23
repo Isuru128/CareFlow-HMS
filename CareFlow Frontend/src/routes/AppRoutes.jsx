@@ -5,6 +5,8 @@ import ResetPasswordPage from '../pages/auth/ResetPasswordPage'
 import DashboardPage from '../pages/dashboard/DashboardPage'
 import UserManagementPage from '../pages/users/UserManagementPage'
 import UserProfilePage from '../pages/users/UserProfilePage'
+import PatientListPage from '../pages/patients/PatientListPage'
+import PatientDetailPage from '../pages/patients/PatientDetailPage'
 import ProtectedRoute from './ProtectedRoute'
 import MainLayout from '../components/layout/MainLayout'
 
@@ -21,6 +23,8 @@ export default function AppRoutes() {
         <Route element={<MainLayout />}>
           <Route path="/dashboard" element={<DashboardPage />} />
           <Route path="/profile" element={<UserProfilePage />} />
+          <Route path="/patients" element={<PatientListPage />} />
+          <Route path="/patients/:id" element={<PatientDetailPage />} />
 
           {/* Admin Protected Routes */}
           <Route element={<ProtectedRoute requiredRole="ROLE_ADMIN" />}>
