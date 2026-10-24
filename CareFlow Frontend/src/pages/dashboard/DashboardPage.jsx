@@ -2,6 +2,8 @@ import { useState, useEffect } from 'react'
 import { useAuth } from '../../context/AuthContext'
 import { Link } from 'react-router-dom'
 import { patientApi } from '../../features/patients/api/patientApi'
+import { doctorApi } from '../../features/doctors/api/doctorApi'
+import { appointmentApi } from '../../features/appointments/api/appointmentApi'
 import {
   Users,
   Shield,
@@ -10,18 +12,23 @@ import {
   Stethoscope,
   Activity,
   ArrowRight,
-  Calendar,
-  FileText
+  CalendarCheck,
+  Clock,
+  CheckCircle2,
+  Building2,
+  Plus
 } from 'lucide-react'
 
 export default function DashboardPage() {
   const { user, isAdmin } = useAuth()
   const [patientStats, setPatientStats] = useState(null)
+  const [doctorStats, setDoctorStats] = useState(null)
+  const [appointmentStats, setAppointmentStats] = useState(null)
 
   useEffect(() => {
-    patientApi.getPatientStats()
-      .then((data) => setPatientStats(data))
-      .catch(() => {})
+    patientApi.getPatientStats().then(setPatientStats).catch(() => {})
+    doctorApi.getDoctorStats().then(setDoctorStats).catch(() => {})
+    appointmentApi.getAppointmentStats().then(setAppointmentStats).catch(() => {})
   }, [])
 
   return (
@@ -32,7 +39,7 @@ export default function DashboardPage() {
           Welcome back, {user?.firstName} {user?.lastName}!
         </h1>
         <p style={{ fontSize: '0.9rem', color: 'var(--text-muted)' }}>
-          Hospital Management Portal • Role: <strong style={{ color: 'var(--primary)' }}>{user?.roles?.map(r => r.replace('ROLE_', '')).join(', ')}</strong>
+          CareFlow Hospital Management Platform • Role: <strong style={{ color: 'var(--primary)' }}>{user?.roles?.map(r => r.replace('ROLE_', '')).join(', ')}</strong>
         </p>
       </div>
 
@@ -49,7 +56,7 @@ export default function DashboardPage() {
                 backgroundColor: 'var(--primary-light)',
                 color: 'var(--primary)'
               }}>
-                <Stethoscope size={28} />
+                <HeartPulse size={28} />
               </div>
 
               {patientStats && (
@@ -64,11 +71,11 @@ export default function DashboardPage() {
 
             <h2 style={{ fontSize: '1.25rem', fontWeight: 700, marginBottom: '0.5rem' }}>Patient Management</h2>
             <p style={{ fontSize: '0.85rem', color: 'var(--text-muted)', marginBottom: '1.25rem' }}>
-              Register new patients, view complete electronic medical records (EMR), attach lab & scan documents, and track diagnosis histories.
+              Register new patients, view electronic medical records (EMR), attach lab reports, and manage medical histories.
             </p>
 
             {patientStats && (
-              <div style={{ display: 'flex', gap: '0.75rem', marginBottom: '1.5rem', flexWrap: 'wrap' }}>
+              <div style={{ display: 'flex', gap: '0.5rem', marginBottom: '1.5rem', flexWrap: 'wrap' }}>
                 <span style={{ fontSize: '0.75rem', background: 'var(--success-bg)', color: '#065f46', padding: '0.25rem 0.6rem', borderRadius: 'var(--radius-sm)', fontWeight: 600 }}>
                   {patientStats.activePatients} Active Patients
                 </span>
@@ -81,6 +88,103 @@ export default function DashboardPage() {
 
           <Link to="/patients" className="btn btn-primary" style={{ width: '100%', justifyContent: 'space-between' }}>
             <span>Go to Patient Directory</span>
+            <ArrowRight size={16} />
+          </Link>
+        </div>
+
+        {/* Doctor Management Card */}
+        <div className="card card-hover" style={{ display: 'flex', flexDirection: 'column', justifyContent: 'space-between', borderTop: '4px solid #0284c7' }}>
+          <div>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
+              <div style={{
+                display: 'inline-flex',
+                padding: '0.75rem',
+                borderRadius: 'var(--radius-md)',
+                backgroundColor: '#e0f2fe',
+                color: '#0284c7'
+              }}>
+                <Stethoscope size={28} />
+              </div>
+
+              {doctorStats && (
+                <div style={{ textAlign: 'right' }}>
+                  <div style={{ fontSize: '1.6rem', fontWeight: 800, color: '#0284c7' }}>
+                    {doctorStats.totalDoctors}
+                  </div>
+                  <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', fontWeight: 600 }}>Total Physicians</div>
+                </div>
+              )}
+            </div>
+
+            <h2 style={{ fontSize: '1.25rem', fontWeight: 700, marginBottom: '0.5rem' }}>Doctor Management</h2>
+            <p style={{ fontSize: '0.85rem', color: 'var(--text-muted)', marginBottom: '1.25rem' }}>
+              Manage clinical specialists, medical licenses, department assignments, and configure recurring weekly working schedules.
+            </p>
+
+            {doctorStats && (
+              <div style={{ display: 'flex', gap: '0.5rem', marginBottom: '1.5rem', flexWrap: 'wrap' }}>
+                <span style={{ fontSize: '0.75rem', background: 'var(--success-bg)', color: '#065f46', padding: '0.25rem 0.6rem', borderRadius: 'var(--radius-sm)', fontWeight: 600 }}>
+                  {doctorStats.activeDoctors} Active Practice
+                </span>
+                <span style={{ fontSize: '0.75rem', background: '#ede9fe', color: '#6d28d9', padding: '0.25rem 0.6rem', borderRadius: 'var(--radius-sm)', fontWeight: 600 }}>
+                  {doctorStats.totalDepartments} Departments
+                </span>
+              </div>
+            )}
+          </div>
+
+          <Link to="/doctors" className="btn btn-secondary" style={{ width: '100%', justifyContent: 'space-between' }}>
+            <span>Manage Doctors & Shifts</span>
+            <ArrowRight size={16} />
+          </Link>
+        </div>
+
+        {/* Appointment Management Card */}
+        <div className="card card-hover" style={{ display: 'flex', flexDirection: 'column', justifyContent: 'space-between', borderTop: '4px solid #10b981' }}>
+          <div>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
+              <div style={{
+                display: 'inline-flex',
+                padding: '0.75rem',
+                borderRadius: 'var(--radius-md)',
+                backgroundColor: '#ecfdf5',
+                color: '#10b981'
+              }}>
+                <CalendarCheck size={28} />
+              </div>
+
+              {appointmentStats && (
+                <div style={{ textAlign: 'right' }}>
+                  <div style={{ fontSize: '1.6rem', fontWeight: 800, color: '#10b981' }}>
+                    {appointmentStats.todayAppointments}
+                  </div>
+                  <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', fontWeight: 600 }}>Appointments Today</div>
+                </div>
+              )}
+            </div>
+
+            <h2 style={{ fontSize: '1.25rem', fontWeight: 700, marginBottom: '0.5rem' }}>Appointments & Scheduling</h2>
+            <p style={{ fontSize: '0.85rem', color: 'var(--text-muted)', marginBottom: '1.25rem' }}>
+              Book doctor consultations, allocate tokens, view clinic calendar schedules, track patient queues and reschedules.
+            </p>
+
+            {appointmentStats && (
+              <div style={{ display: 'flex', gap: '0.5rem', marginBottom: '1.5rem', flexWrap: 'wrap' }}>
+                <span style={{ fontSize: '0.75rem', background: '#fef3c7', color: '#b45309', padding: '0.25rem 0.6rem', borderRadius: 'var(--radius-sm)', fontWeight: 600 }}>
+                  {appointmentStats.todayInProgress} In Progress
+                </span>
+                <span style={{ fontSize: '0.75rem', background: '#ecfdf5', color: '#047857', padding: '0.25rem 0.6rem', borderRadius: 'var(--radius-sm)', fontWeight: 600 }}>
+                  {appointmentStats.todayCompleted} Completed
+                </span>
+                <span style={{ fontSize: '0.75rem', background: '#e0f2fe', color: '#0369a1', padding: '0.25rem 0.6rem', borderRadius: 'var(--radius-sm)', fontWeight: 600 }}>
+                  {appointmentStats.upcomingAppointments} Upcoming
+                </span>
+              </div>
+            )}
+          </div>
+
+          <Link to="/appointments" className="btn btn-secondary" style={{ width: '100%', justifyContent: 'space-between' }}>
+            <span>View Appointments & Calendar</span>
             <ArrowRight size={16} />
           </Link>
         </div>
@@ -112,14 +216,14 @@ export default function DashboardPage() {
         )}
 
         {/* Account Profile Card */}
-        <div className="card card-hover" style={{ display: 'flex', flexDirection: 'column', justifyContent: 'space-between', borderTop: '4px solid #10b981' }}>
+        <div className="card card-hover" style={{ display: 'flex', flexDirection: 'column', justifyContent: 'space-between', borderTop: '4px solid #8b5cf6' }}>
           <div>
             <div style={{
               display: 'inline-flex',
               padding: '0.75rem',
               borderRadius: 'var(--radius-md)',
-              backgroundColor: '#ecfdf5',
-              color: '#10b981',
+              backgroundColor: '#ede9fe',
+              color: '#8b5cf6',
               marginBottom: '1rem'
             }}>
               <UserCheck size={28} />
