@@ -7,6 +7,8 @@ import UserManagementPage from '../pages/users/UserManagementPage'
 import UserProfilePage from '../pages/users/UserProfilePage'
 import PatientListPage from '../pages/patients/PatientListPage'
 import PatientDetailPage from '../pages/patients/PatientDetailPage'
+import DoctorListPage from '../pages/doctors/DoctorListPage'
+import AppointmentListPage from '../pages/appointments/AppointmentListPage'
 import ProtectedRoute from './ProtectedRoute'
 import MainLayout from '../components/layout/MainLayout'
 
@@ -25,6 +27,8 @@ export default function AppRoutes() {
           <Route path="/profile" element={<UserProfilePage />} />
           <Route path="/patients" element={<PatientListPage />} />
           <Route path="/patients/:id" element={<PatientDetailPage />} />
+          <Route path="/doctors" element={<DoctorListPage />} />
+          <Route path="/appointments" element={<AppointmentListPage />} />
 
           {/* Admin Protected Routes */}
           <Route element={<ProtectedRoute requiredRole="ROLE_ADMIN" />}>
