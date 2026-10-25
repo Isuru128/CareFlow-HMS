@@ -9,6 +9,7 @@ import PatientListPage from '../pages/patients/PatientListPage'
 import PatientDetailPage from '../pages/patients/PatientDetailPage'
 import DoctorListPage from '../pages/doctors/DoctorListPage'
 import AppointmentListPage from '../pages/appointments/AppointmentListPage'
+import EmrDashboardPage from '../pages/emr/EmrDashboardPage'
 import ProtectedRoute from './ProtectedRoute'
 import MainLayout from '../components/layout/MainLayout'
 
@@ -29,6 +30,7 @@ export default function AppRoutes() {
           <Route path="/patients/:id" element={<PatientDetailPage />} />
           <Route path="/doctors" element={<DoctorListPage />} />
           <Route path="/appointments" element={<AppointmentListPage />} />
+          <Route path="/emr" element={<EmrDashboardPage />} />
 
           {/* Admin Protected Routes */}
           <Route element={<ProtectedRoute requiredRole="ROLE_ADMIN" />}>

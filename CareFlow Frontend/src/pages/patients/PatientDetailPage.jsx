@@ -5,6 +5,7 @@ import PatientStatusBadge from '../../features/patients/components/PatientStatus
 import PatientModal from '../../features/patients/components/PatientModal'
 import MedicalHistoryModal from '../../features/patients/components/MedicalHistoryModal'
 import DocumentUploadModal from '../../features/patients/components/DocumentUploadModal'
+import PatientEmrSummaryModal from '../../features/emr/components/PatientEmrSummaryModal'
 import { useAuth } from '../../context/AuthContext'
 import {
   ArrowLeft,
@@ -29,7 +30,8 @@ import {
   File,
   FileSpreadsheet,
   Image as ImageIcon,
-  Activity
+  Activity,
+  HeartPulse
 } from 'lucide-react'
 
 export default function PatientDetailPage() {
@@ -52,6 +54,7 @@ export default function PatientDetailPage() {
   const [isHistoryModalOpen, setIsHistoryModalOpen] = useState(false)
   const [historyToEdit, setHistoryToEdit] = useState(null)
   const [isDocModalOpen, setIsDocModalOpen] = useState(false)
+  const [isSummaryModalOpen, setIsSummaryModalOpen] = useState(false)
 
   // Role checks
   const canManageMedical = user?.roles?.some((r) =>
@@ -294,6 +297,14 @@ export default function PatientDetailPage() {
               onClick={() => setIsEditModalOpen(true)}
             >
               <Edit2 size={15} /> Edit Patient
+            </button>
+
+            <button
+              className="btn btn-outline btn-sm"
+              onClick={() => setIsSummaryModalOpen(true)}
+              style={{ borderColor: 'var(--primary)', color: 'var(--primary)' }}
+            >
+              <HeartPulse size={15} /> EMR Health Chart
             </button>
 
             {canManageMedical && (
@@ -720,6 +731,13 @@ export default function PatientDetailPage() {
           fetchPatientDetails()
           setFeedback({ error: '', success: 'Patient document uploaded successfully.' })
         }}
+      />
+
+      {/* Full EMR Health Chart Modal */}
+      <PatientEmrSummaryModal
+        isOpen={isSummaryModalOpen}
+        patientId={id}
+        onClose={() => setIsSummaryModalOpen(false)}
       />
     </div>
   )
