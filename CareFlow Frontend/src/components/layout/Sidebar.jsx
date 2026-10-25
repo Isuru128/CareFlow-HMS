@@ -1,6 +1,6 @@
 import { NavLink } from 'react-router-dom'
 import { useAuth } from '../../context/AuthContext'
-import { LayoutDashboard, Users, UserCheck, ShieldAlert, HeartPulse, Stethoscope, CalendarCheck, UserRoundCheck } from 'lucide-react'
+import { LayoutDashboard, Users, UserCheck, ShieldAlert, HeartPulse, Stethoscope, CalendarCheck, UserRoundCheck, ClipboardList } from 'lucide-react'
 
 export default function Sidebar() {
   const { user, isAdmin } = useAuth()
@@ -50,6 +50,14 @@ export default function Sidebar() {
         >
           <CalendarCheck size={18} />
           <span>Appointments</span>
+        </NavLink>
+
+        <NavLink
+          to="/emr"
+          className={({ isActive }) => `sidebar-link ${isActive ? 'active' : ''}`}
+        >
+          <ClipboardList size={18} />
+          <span>Medical Records (EMR)</span>
         </NavLink>
 
         {isAdmin && (
