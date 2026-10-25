@@ -271,3 +271,261 @@ VALUES (
 )
 ON CONFLICT (patient_number) DO NOTHING;
 
+-- ==============================================================================
+-- Module 3.3 - Doctor Management
+-- ==============================================================================
+
+-- ------------------------------------------------------------------------------
+-- 9. DEPARTMENTS TABLE
+-- Clinical and administrative departments for doctor assignment.
+-- ------------------------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS departments (
+    id BIGSERIAL PRIMARY KEY,
+    name VARCHAR(100) NOT NULL UNIQUE,
+    code VARCHAR(20) NOT NULL UNIQUE,
+    description TEXT,
+    contact_number VARCHAR(20),
+    is_active BOOLEAN NOT NULL DEFAULT TRUE,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+
+-- ------------------------------------------------------------------------------
+-- 10. DOCTORS TABLE
+-- Profiles, medical licenses, specializations, departments, and consult fees.
+-- ------------------------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS doctors (
+    id BIGSERIAL PRIMARY KEY,
+    doctor_number VARCHAR(30) NOT NULL UNIQUE,
+    user_id BIGINT REFERENCES users(id) ON DELETE SET NULL,
+    first_name VARCHAR(50) NOT NULL,
+    last_name VARCHAR(50) NOT NULL,
+    specialization VARCHAR(100) NOT NULL,
+    license_number VARCHAR(50) NOT NULL UNIQUE,
+    department_id BIGINT NOT NULL REFERENCES departments(id) ON DELETE RESTRICT,
+    qualification VARCHAR(150) NOT NULL,
+    experience_years INT,
+    contact_number VARCHAR(20) NOT NULL,
+    email VARCHAR(100),
+    consultation_fee NUMERIC(10, 2) NOT NULL DEFAULT 0.00,
+    room_number VARCHAR(30),
+    bio TEXT,
+    status VARCHAR(20) NOT NULL DEFAULT 'ACTIVE' CHECK (status IN ('ACTIVE', 'ON_LEAVE', 'INACTIVE', 'RETIRED')),
+    registered_by BIGINT REFERENCES users(id) ON DELETE SET NULL,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+
+-- ------------------------------------------------------------------------------
+-- 11. DOCTOR SCHEDULES TABLE
+-- Weekly recurring working schedules, slots, and capacity management.
+-- ------------------------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS doctor_schedules (
+    id BIGSERIAL PRIMARY KEY,
+    doctor_id BIGINT NOT NULL REFERENCES doctors(id) ON DELETE CASCADE,
+    day_of_week VARCHAR(20) NOT NULL CHECK (
+        day_of_week IN ('MONDAY', 'TUESDAY', 'WEDNESDAY', 'THURSDAY', 'FRIDAY', 'SATURDAY', 'SUNDAY')
+    ),
+    start_time TIME NOT NULL,
+    end_time TIME NOT NULL,
+    max_patients INT NOT NULL DEFAULT 20,
+    slot_duration_minutes INT NOT NULL DEFAULT 15,
+    room_number VARCHAR(30),
+    is_active BOOLEAN NOT NULL DEFAULT TRUE,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    CONSTRAINT uq_doctor_schedule_day_time UNIQUE (doctor_id, day_of_week, start_time)
+);
+
+-- ==============================================================================
+-- Module 3.4 - Appointment Management
+-- ==============================================================================
+
+-- ------------------------------------------------------------------------------
+-- 12. APPOINTMENTS TABLE
+-- Central appointment booking, scheduling, status tracking, and notes.
+-- ------------------------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS appointments (
+    id BIGSERIAL PRIMARY KEY,
+    appointment_number VARCHAR(30) NOT NULL UNIQUE,
+    patient_id BIGINT NOT NULL REFERENCES patients(id) ON DELETE RESTRICT,
+    doctor_id BIGINT NOT NULL REFERENCES doctors(id) ON DELETE RESTRICT,
+    department_id BIGINT NOT NULL REFERENCES departments(id) ON DELETE RESTRICT,
+    appointment_date DATE NOT NULL,
+    appointment_time TIME NOT NULL,
+    queue_number INT NOT NULL,
+    appointment_type VARCHAR(30) NOT NULL DEFAULT 'CONSULTATION' CHECK (
+        appointment_type IN ('CONSULTATION', 'FOLLOW_UP', 'ROUTINE_CHECKUP', 'EMERGENCY')
+    ),
+    status VARCHAR(30) NOT NULL DEFAULT 'SCHEDULED' CHECK (
+        status IN ('SCHEDULED', 'CONFIRMED', 'IN_PROGRESS', 'COMPLETED', 'CANCELLED', 'NO_SHOW', 'RESCHEDULED')
+    ),
+    reason TEXT,
+    notes TEXT,
+    consultation_fee NUMERIC(10, 2),
+    cancellation_reason TEXT,
+    cancelled_at TIMESTAMPTZ,
+    cancelled_by BIGINT REFERENCES users(id) ON DELETE SET NULL,
+    booked_by BIGINT REFERENCES users(id) ON DELETE SET NULL,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+
+-- ------------------------------------------------------------------------------
+-- INDEXES FOR DOCTOR & APPOINTMENT MANAGEMENT
+-- ------------------------------------------------------------------------------
+CREATE INDEX IF NOT EXISTS idx_departments_name ON departments(name);
+CREATE INDEX IF NOT EXISTS idx_departments_code ON departments(code);
+CREATE INDEX IF NOT EXISTS idx_departments_is_active ON departments(is_active);
+
+CREATE INDEX IF NOT EXISTS idx_doctors_doctor_number ON doctors(doctor_number);
+CREATE INDEX IF NOT EXISTS idx_doctors_specialization ON doctors(specialization);
+CREATE INDEX IF NOT EXISTS idx_doctors_license_number ON doctors(license_number);
+CREATE INDEX IF NOT EXISTS idx_doctors_department_id ON doctors(department_id);
+CREATE INDEX IF NOT EXISTS idx_doctors_status ON doctors(status);
+
+CREATE INDEX IF NOT EXISTS idx_doctor_schedules_doctor_id ON doctor_schedules(doctor_id);
+CREATE INDEX IF NOT EXISTS idx_doctor_schedules_day_of_week ON doctor_schedules(day_of_week);
+CREATE INDEX IF NOT EXISTS idx_doctor_schedules_is_active ON doctor_schedules(is_active);
+
+CREATE INDEX IF NOT EXISTS idx_appointments_appointment_number ON appointments(appointment_number);
+CREATE INDEX IF NOT EXISTS idx_appointments_patient_id ON appointments(patient_id);
+CREATE INDEX IF NOT EXISTS idx_appointments_doctor_id ON appointments(doctor_id);
+CREATE INDEX IF NOT EXISTS idx_appointments_department_id ON appointments(department_id);
+CREATE INDEX IF NOT EXISTS idx_appointments_date ON appointments(appointment_date);
+CREATE INDEX IF NOT EXISTS idx_appointments_status ON appointments(status);
+CREATE INDEX IF NOT EXISTS idx_appointments_doctor_date ON appointments(doctor_id, appointment_date);
+
+-- ------------------------------------------------------------------------------
+-- TRIGGERS FOR DOCTOR & APPOINTMENT TIMESTAMPS
+-- ------------------------------------------------------------------------------
+DROP TRIGGER IF EXISTS trg_update_departments_timestamp ON departments;
+CREATE TRIGGER trg_update_departments_timestamp
+BEFORE UPDATE ON departments
+FOR EACH ROW
+EXECUTE FUNCTION update_timestamp_column();
+
+DROP TRIGGER IF EXISTS trg_update_doctors_timestamp ON doctors;
+CREATE TRIGGER trg_update_doctors_timestamp
+BEFORE UPDATE ON doctors
+FOR EACH ROW
+EXECUTE FUNCTION update_timestamp_column();
+
+DROP TRIGGER IF EXISTS trg_update_doctor_schedules_timestamp ON doctor_schedules;
+CREATE TRIGGER trg_update_doctor_schedules_timestamp
+BEFORE UPDATE ON doctor_schedules
+FOR EACH ROW
+EXECUTE FUNCTION update_timestamp_column();
+
+DROP TRIGGER IF EXISTS trg_update_appointments_timestamp ON appointments;
+CREATE TRIGGER trg_update_appointments_timestamp
+BEFORE UPDATE ON appointments
+FOR EACH ROW
+EXECUTE FUNCTION update_timestamp_column();
+
+-- ------------------------------------------------------------------------------
+-- SEED DATA: Departments, Doctors, Schedules & Sample Appointments
+-- ------------------------------------------------------------------------------
+INSERT INTO departments (name, code, description, contact_number, is_active)
+VALUES
+    ('Cardiology', 'CARD', 'Comprehensive cardiovascular medicine and care', '+94112345001', TRUE),
+    ('Pediatrics', 'PED', 'Child health and infant medical treatment', '+94112345002', TRUE),
+    ('General Medicine', 'GEN', 'General healthcare, diagnoses, and inpatient care', '+94112345003', TRUE),
+    ('Orthopedics', 'ORTHO', 'Musculoskeletal system, spine, joints, and fractures', '+94112345004', TRUE),
+    ('Neurology', 'NEUR', 'Brain, spinal cord, and nervous system disorders', '+94112345005', TRUE)
+ON CONFLICT (code) DO NOTHING;
+
+INSERT INTO doctors (doctor_number, first_name, last_name, specialization, license_number, department_id, qualification, experience_years, contact_number, email, consultation_fee, room_number, bio, status)
+SELECT
+    'DOC-10001',
+    'Kumara',
+    'Perera',
+    'Cardiologist',
+    'SLMC-12345',
+    d.id,
+    'MBBS, MD (Cardiology), FRCP',
+    15,
+    '+94771234567',
+    'kumara.perera@careflow.lk',
+    3500.00,
+    'Room 102',
+    'Senior Consultant Cardiologist specializing in preventive and interventional cardiology.',
+    'ACTIVE'
+FROM departments d
+WHERE d.code = 'CARD'
+ON CONFLICT (doctor_number) DO NOTHING;
+
+INSERT INTO doctors (doctor_number, first_name, last_name, specialization, license_number, department_id, qualification, experience_years, contact_number, email, consultation_fee, room_number, bio, status)
+SELECT
+    'DOC-10002',
+    'Anoma',
+    'Senanayake',
+    'Pediatrician',
+    'SLMC-23456',
+    d.id,
+    'MBBS, DCH, MD (Pediatrics)',
+    12,
+    '+94772345678',
+    'anoma.senanayake@careflow.lk',
+    2800.00,
+    'Room 205',
+    'Consultant Pediatrician with over a decade of clinical care experience in child wellness.',
+    'ACTIVE'
+FROM departments d
+WHERE d.code = 'PED'
+ON CONFLICT (doctor_number) DO NOTHING;
+
+INSERT INTO doctors (doctor_number, first_name, last_name, specialization, license_number, department_id, qualification, experience_years, contact_number, email, consultation_fee, room_number, bio, status)
+SELECT
+    'DOC-10003',
+    'Rohan',
+    'Wickramasinghe',
+    'General Physician',
+    'SLMC-34567',
+    d.id,
+    'MBBS, MD (General Medicine)',
+    18,
+    '+94773456789',
+    'rohan.wick@careflow.lk',
+    2500.00,
+    'Room 108',
+    'Senior General Physician experienced in chronic illness management and adult medicine.',
+    'ACTIVE'
+FROM departments d
+WHERE d.code = 'GEN'
+ON CONFLICT (doctor_number) DO NOTHING;
+
+INSERT INTO doctor_schedules (doctor_id, day_of_week, start_time, end_time, max_patients, slot_duration_minutes, room_number, is_active)
+SELECT doc.id, 'MONDAY', '09:00:00', '12:00:00', 15, 15, 'Room 102', TRUE
+FROM doctors doc WHERE doc.doctor_number = 'DOC-10001'
+ON CONFLICT DO NOTHING;
+
+INSERT INTO doctor_schedules (doctor_id, day_of_week, start_time, end_time, max_patients, slot_duration_minutes, room_number, is_active)
+SELECT doc.id, 'WEDNESDAY', '09:00:00', '12:00:00', 15, 15, 'Room 102', TRUE
+FROM doctors doc WHERE doc.doctor_number = 'DOC-10001'
+ON CONFLICT DO NOTHING;
+
+INSERT INTO doctor_schedules (doctor_id, day_of_week, start_time, end_time, max_patients, slot_duration_minutes, room_number, is_active)
+SELECT doc.id, 'TUESDAY', '14:00:00', '17:00:00', 20, 15, 'Room 205', TRUE
+FROM doctors doc WHERE doc.doctor_number = 'DOC-10002'
+ON CONFLICT DO NOTHING;
+
+INSERT INTO appointments (appointment_number, patient_id, doctor_id, department_id, appointment_date, appointment_time, queue_number, appointment_type, status, reason, notes, consultation_fee)
+SELECT
+    'APT-10001',
+    p.id,
+    d.id,
+    d.department_id,
+    CURRENT_DATE + INTERVAL '1 day',
+    '09:30:00',
+    1,
+    'CONSULTATION',
+    'SCHEDULED',
+    'Routine cardiology follow-up and blood pressure assessment',
+    'Initial follow-up requested by patient',
+    d.consultation_fee
+FROM patients p, doctors d
+WHERE p.patient_number = 'PAT-10001' AND d.doctor_number = 'DOC-10001'
+ON CONFLICT (appointment_number) DO NOTHING;
+
+
