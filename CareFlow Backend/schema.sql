@@ -528,4 +528,359 @@ FROM patients p, doctors d
 WHERE p.patient_number = 'PAT-10001' AND d.doctor_number = 'DOC-10001'
 ON CONFLICT (appointment_number) DO NOTHING;
 
+-- ==============================================================================
+-- Module 3.5 - Electronic Medical Records (EMR)
+-- ==============================================================================
+
+-- ------------------------------------------------------------------------------
+-- 13. MEDICAL RECORDS TABLE
+-- Central clinical encounters, consultations, vital signs, and examination notes.
+-- ------------------------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS medical_records (
+    id BIGSERIAL PRIMARY KEY,
+    record_number VARCHAR(30) NOT NULL UNIQUE,
+    patient_id BIGINT NOT NULL REFERENCES patients(id) ON DELETE CASCADE,
+    doctor_id BIGINT NOT NULL REFERENCES doctors(id) ON DELETE RESTRICT,
+    appointment_id BIGINT REFERENCES appointments(id) ON DELETE SET NULL,
+    visit_date TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    chief_complaint TEXT NOT NULL,
+    examination_notes TEXT,
+    clinical_notes TEXT,
+    blood_pressure VARCHAR(20),
+    temperature_celsius NUMERIC(4, 1),
+    heart_rate_bpm INT,
+    respiratory_rate_bpm INT,
+    weight_kg NUMERIC(5, 2),
+    height_cm NUMERIC(5, 2),
+    bmi NUMERIC(4, 1),
+    oxygen_saturation INT,
+    status VARCHAR(20) NOT NULL DEFAULT 'FINALIZED' CHECK (status IN ('DRAFT', 'FINALIZED', 'ARCHIVED')),
+    created_by BIGINT REFERENCES users(id) ON DELETE SET NULL,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+
+-- ------------------------------------------------------------------------------
+-- 14. PATIENT DIAGNOSES TABLE
+-- Records confirmed, provisional, primary, and secondary patient diagnoses.
+-- ------------------------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS patient_diagnoses (
+    id BIGSERIAL PRIMARY KEY,
+    medical_record_id BIGINT REFERENCES medical_records(id) ON DELETE CASCADE,
+    patient_id BIGINT NOT NULL REFERENCES patients(id) ON DELETE CASCADE,
+    doctor_id BIGINT NOT NULL REFERENCES doctors(id) ON DELETE RESTRICT,
+    icd10_code VARCHAR(30),
+    diagnosis_name VARCHAR(255) NOT NULL,
+    diagnosis_type VARCHAR(30) NOT NULL DEFAULT 'PRIMARY' CHECK (
+        diagnosis_type IN ('PRIMARY', 'SECONDARY', 'PROVISIONAL', 'DIFFERENTIAL', 'FINAL')
+    ),
+    status VARCHAR(30) NOT NULL DEFAULT 'ACTIVE' CHECK (
+        status IN ('ACTIVE', 'CHRONIC', 'RESOLVED', 'IN_REMISSION')
+    ),
+    severity VARCHAR(30) CHECK (severity IN ('MILD', 'MODERATE', 'SEVERE')),
+    diagnosed_date DATE NOT NULL DEFAULT CURRENT_DATE,
+    resolved_date DATE,
+    notes TEXT,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+
+-- ------------------------------------------------------------------------------
+-- 15. PRESCRIPTIONS TABLE
+-- Doctor-issued medication orders for patient pharmacy dispensing.
+-- ------------------------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS prescriptions (
+    id BIGSERIAL PRIMARY KEY,
+    prescription_number VARCHAR(30) NOT NULL UNIQUE,
+    medical_record_id BIGINT REFERENCES medical_records(id) ON DELETE CASCADE,
+    patient_id BIGINT NOT NULL REFERENCES patients(id) ON DELETE CASCADE,
+    doctor_id BIGINT NOT NULL REFERENCES doctors(id) ON DELETE RESTRICT,
+    issue_date DATE NOT NULL DEFAULT CURRENT_DATE,
+    valid_until DATE,
+    status VARCHAR(30) NOT NULL DEFAULT 'ACTIVE' CHECK (
+        status IN ('ACTIVE', 'DISPENSED', 'PARTIALLY_DISPENSED', 'CANCELLED', 'EXPIRED')
+    ),
+    instructions TEXT,
+    notes TEXT,
+    dispensed_at TIMESTAMPTZ,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+
+-- ------------------------------------------------------------------------------
+-- 16. PRESCRIPTION ITEMS TABLE
+-- Detailed pharmaceutical items, dosage, route, frequency, and duration.
+-- ------------------------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS prescription_items (
+    id BIGSERIAL PRIMARY KEY,
+    prescription_id BIGINT NOT NULL REFERENCES prescriptions(id) ON DELETE CASCADE,
+    medication_name VARCHAR(255) NOT NULL,
+    dosage VARCHAR(100) NOT NULL,
+    frequency VARCHAR(100) NOT NULL,
+    route VARCHAR(50) NOT NULL DEFAULT 'ORAL' CHECK (
+        route IN ('ORAL', 'INTRAVENOUS', 'INTRAMUSCULAR', 'TOPICAL', 'INHALATION', 'SUBLINGUAL', 'OPHTHALMIC', 'OTHER')
+    ),
+    duration VARCHAR(50) NOT NULL,
+    quantity INT NOT NULL DEFAULT 1,
+    instructions TEXT,
+    is_dispensed BOOLEAN NOT NULL DEFAULT FALSE
+);
+
+-- ------------------------------------------------------------------------------
+-- 17. TREATMENT HISTORIES TABLE
+-- Procedures, therapies, interventions, outcomes, and progress tracking.
+-- ------------------------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS treatment_histories (
+    id BIGSERIAL PRIMARY KEY,
+    patient_id BIGINT NOT NULL REFERENCES patients(id) ON DELETE CASCADE,
+    medical_record_id BIGINT REFERENCES medical_records(id) ON DELETE SET NULL,
+    doctor_id BIGINT REFERENCES doctors(id) ON DELETE SET NULL,
+    treatment_name VARCHAR(255) NOT NULL,
+    category VARCHAR(50) NOT NULL DEFAULT 'MEDICATION_THERAPY' CHECK (
+        category IN ('MEDICATION_THERAPY', 'SURGICAL_PROCEDURE', 'PHYSIOTHERAPY', 'WOUND_CARE', 'DIALYSIS', 'CHEMOTHERAPY', 'REHABILITATION', 'OTHER')
+    ),
+    start_date DATE NOT NULL,
+    end_date DATE,
+    status VARCHAR(30) NOT NULL DEFAULT 'IN_PROGRESS' CHECK (
+        status IN ('PLANNED', 'IN_PROGRESS', 'COMPLETED', 'DISCONTINUED', 'CANCELLED')
+    ),
+    outcome VARCHAR(50) CHECK (
+        outcome IN ('RECOVERED', 'IMPROVED', 'UNCHANGED', 'DETERIORATED', 'NOT_EVALUATED')
+    ),
+    procedure_notes TEXT,
+    complications TEXT,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+
+-- ------------------------------------------------------------------------------
+-- 18. MEDICAL REPORTS TABLE
+-- Clinical summaries, formal medical evaluations, and diagnostic reports.
+-- ------------------------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS medical_reports (
+    id BIGSERIAL PRIMARY KEY,
+    report_number VARCHAR(30) NOT NULL UNIQUE,
+    medical_record_id BIGINT REFERENCES medical_records(id) ON DELETE SET NULL,
+    patient_id BIGINT NOT NULL REFERENCES patients(id) ON DELETE CASCADE,
+    doctor_id BIGINT NOT NULL REFERENCES doctors(id) ON DELETE RESTRICT,
+    report_title VARCHAR(255) NOT NULL,
+    report_type VARCHAR(50) NOT NULL CHECK (
+        report_type IN ('CLINICAL_SUMMARY', 'DISCHARGE_SUMMARY', 'CONSULTATION_NOTE', 'DIAGNOSTIC_SUMMARY', 'SPECIALIST_REFERRAL', 'HEALTH_ASSESSMENT', 'OTHER')
+    ),
+    report_date DATE NOT NULL DEFAULT CURRENT_DATE,
+    clinical_findings TEXT NOT NULL,
+    recommendations TEXT,
+    summary TEXT,
+    attachment_url VARCHAR(512),
+    attachment_name VARCHAR(255),
+    status VARCHAR(20) NOT NULL DEFAULT 'FINALIZED' CHECK (status IN ('DRAFT', 'FINALIZED', 'ARCHIVED')),
+    created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+
+-- ------------------------------------------------------------------------------
+-- INDEXES FOR ELECTRONIC MEDICAL RECORDS (EMR)
+-- ------------------------------------------------------------------------------
+CREATE INDEX IF NOT EXISTS idx_medical_records_record_number ON medical_records(record_number);
+CREATE INDEX IF NOT EXISTS idx_medical_records_patient_id ON medical_records(patient_id);
+CREATE INDEX IF NOT EXISTS idx_medical_records_doctor_id ON medical_records(doctor_id);
+CREATE INDEX IF NOT EXISTS idx_medical_records_appointment_id ON medical_records(appointment_id);
+CREATE INDEX IF NOT EXISTS idx_medical_records_visit_date ON medical_records(visit_date);
+CREATE INDEX IF NOT EXISTS idx_medical_records_status ON medical_records(status);
+
+CREATE INDEX IF NOT EXISTS idx_patient_diagnoses_record_id ON patient_diagnoses(medical_record_id);
+CREATE INDEX IF NOT EXISTS idx_patient_diagnoses_patient_id ON patient_diagnoses(patient_id);
+CREATE INDEX IF NOT EXISTS idx_patient_diagnoses_doctor_id ON patient_diagnoses(doctor_id);
+CREATE INDEX IF NOT EXISTS idx_patient_diagnoses_icd10 ON patient_diagnoses(icd10_code);
+CREATE INDEX IF NOT EXISTS idx_patient_diagnoses_status ON patient_diagnoses(status);
+
+CREATE INDEX IF NOT EXISTS idx_prescriptions_rx_number ON prescriptions(prescription_number);
+CREATE INDEX IF NOT EXISTS idx_prescriptions_record_id ON prescriptions(medical_record_id);
+CREATE INDEX IF NOT EXISTS idx_prescriptions_patient_id ON prescriptions(patient_id);
+CREATE INDEX IF NOT EXISTS idx_prescriptions_doctor_id ON prescriptions(doctor_id);
+CREATE INDEX IF NOT EXISTS idx_prescriptions_status ON prescriptions(status);
+
+CREATE INDEX IF NOT EXISTS idx_prescription_items_rx_id ON prescription_items(prescription_id);
+
+CREATE INDEX IF NOT EXISTS idx_treatment_histories_patient_id ON treatment_histories(patient_id);
+CREATE INDEX IF NOT EXISTS idx_treatment_histories_record_id ON treatment_histories(medical_record_id);
+CREATE INDEX IF NOT EXISTS idx_treatment_histories_status ON treatment_histories(status);
+
+CREATE INDEX IF NOT EXISTS idx_medical_reports_report_number ON medical_reports(report_number);
+CREATE INDEX IF NOT EXISTS idx_medical_reports_patient_id ON medical_reports(patient_id);
+CREATE INDEX IF NOT EXISTS idx_medical_reports_doctor_id ON medical_reports(doctor_id);
+CREATE INDEX IF NOT EXISTS idx_medical_reports_report_type ON medical_reports(report_type);
+
+-- ------------------------------------------------------------------------------
+-- TRIGGERS FOR EMR TIMESTAMPS
+-- ------------------------------------------------------------------------------
+DROP TRIGGER IF EXISTS trg_update_medical_records_timestamp ON medical_records;
+CREATE TRIGGER trg_update_medical_records_timestamp
+BEFORE UPDATE ON medical_records
+FOR EACH ROW
+EXECUTE FUNCTION update_timestamp_column();
+
+DROP TRIGGER IF EXISTS trg_update_patient_diagnoses_timestamp ON patient_diagnoses;
+CREATE TRIGGER trg_update_patient_diagnoses_timestamp
+BEFORE UPDATE ON patient_diagnoses
+FOR EACH ROW
+EXECUTE FUNCTION update_timestamp_column();
+
+DROP TRIGGER IF EXISTS trg_update_prescriptions_timestamp ON prescriptions;
+CREATE TRIGGER trg_update_prescriptions_timestamp
+BEFORE UPDATE ON prescriptions
+FOR EACH ROW
+EXECUTE FUNCTION update_timestamp_column();
+
+DROP TRIGGER IF EXISTS trg_update_treatment_histories_timestamp ON treatment_histories;
+CREATE TRIGGER trg_update_treatment_histories_timestamp
+BEFORE UPDATE ON treatment_histories
+FOR EACH ROW
+EXECUTE FUNCTION update_timestamp_column();
+
+DROP TRIGGER IF EXISTS trg_update_medical_reports_timestamp ON medical_reports;
+CREATE TRIGGER trg_update_medical_reports_timestamp
+BEFORE UPDATE ON medical_reports
+FOR EACH ROW
+EXECUTE FUNCTION update_timestamp_column();
+
+-- ------------------------------------------------------------------------------
+-- SEED DATA: Medical Records, Diagnoses, Prescriptions, Treatments & Reports
+-- ------------------------------------------------------------------------------
+INSERT INTO medical_records (
+    record_number, patient_id, doctor_id, appointment_id, visit_date,
+    chief_complaint, examination_notes, clinical_notes,
+    blood_pressure, temperature_celsius, heart_rate_bpm, respiratory_rate_bpm, weight_kg, height_cm, bmi, oxygen_saturation, status
+)
+SELECT
+    'EMR-10001',
+    p.id,
+    d.id,
+    a.id,
+    CURRENT_TIMESTAMP,
+    'Mild chest tightness on exertion and occasional dizziness over past 2 weeks.',
+    'S1 S2 normal, no murmurs. Lungs clear to auscultation bilaterally. No pedal edema.',
+    'Stage 1 Hypertension confirmed with mild exertion angina symptoms. ECG recommended.',
+    '138/88',
+    36.7,
+    76,
+    16,
+    78.00,
+    175.00,
+    25.5,
+    98,
+    'FINALIZED'
+FROM patients p, doctors d
+LEFT JOIN appointments a ON a.appointment_number = 'APT-10001'
+WHERE p.patient_number = 'PAT-10001' AND d.doctor_number = 'DOC-10001'
+ON CONFLICT (record_number) DO NOTHING;
+
+INSERT INTO patient_diagnoses (
+    medical_record_id, patient_id, doctor_id, icd10_code, diagnosis_name, diagnosis_type, status, severity, diagnosed_date, notes
+)
+SELECT
+    mr.id,
+    mr.patient_id,
+    mr.doctor_id,
+    'I10',
+    'Essential (primary) hypertension',
+    'PRIMARY',
+    'ACTIVE',
+    'MODERATE',
+    CURRENT_DATE,
+    'Patient instructed on dietary sodium restriction and daily blood pressure monitoring.'
+FROM medical_records mr
+WHERE mr.record_number = 'EMR-10001'
+ON CONFLICT DO NOTHING;
+
+INSERT INTO prescriptions (
+    prescription_number, medical_record_id, patient_id, doctor_id, issue_date, valid_until, status, instructions, notes
+)
+SELECT
+    'RX-10001',
+    mr.id,
+    mr.patient_id,
+    mr.doctor_id,
+    CURRENT_DATE,
+    CURRENT_DATE + INTERVAL '30 days',
+    'ACTIVE',
+    'Take medications regularly as directed. Return for follow-up in 4 weeks.',
+    'Monitor blood pressure each morning.'
+FROM medical_records mr
+WHERE mr.record_number = 'EMR-10001'
+ON CONFLICT (prescription_number) DO NOTHING;
+
+INSERT INTO prescription_items (
+    prescription_id, medication_name, dosage, frequency, route, duration, quantity, instructions, is_dispensed
+)
+SELECT
+    rx.id,
+    'Amlodipine 5mg Tablet',
+    '5 mg',
+    'Once Daily (Morning)',
+    'ORAL',
+    '30 Days',
+    30,
+    'Take 1 tablet every morning with or without food',
+    FALSE
+FROM prescriptions rx
+WHERE rx.prescription_number = 'RX-10001'
+ON CONFLICT DO NOTHING;
+
+INSERT INTO prescription_items (
+    prescription_id, medication_name, dosage, frequency, route, duration, quantity, instructions, is_dispensed
+)
+SELECT
+    rx.id,
+    'Aspirin 75mg Tablet',
+    '75 mg',
+    'Once Daily (Night)',
+    'ORAL',
+    '30 Days',
+    30,
+    'Take 1 tablet after dinner with a full glass of water',
+    FALSE
+FROM prescriptions rx
+WHERE rx.prescription_number = 'RX-10001'
+ON CONFLICT DO NOTHING;
+
+INSERT INTO treatment_histories (
+    patient_id, medical_record_id, doctor_id, treatment_name, category, start_date, end_date, status, outcome, procedure_notes, complications
+)
+SELECT
+    p.id,
+    mr.id,
+    d.id,
+    'Antihypertensive Pharmacotherapy & Lifestyle Counseling',
+    'MEDICATION_THERAPY',
+    CURRENT_DATE,
+    NULL,
+    'IN_PROGRESS',
+    'IMPROVED',
+    'Initiated calcium channel blocker therapy (Amlodipine 5mg). Prescribed DASH diet and 30 min daily walking.',
+    'None reported'
+FROM patients p, doctors d, medical_records mr
+WHERE p.patient_number = 'PAT-10001' AND d.doctor_number = 'DOC-10001' AND mr.record_number = 'EMR-10001'
+ON CONFLICT DO NOTHING;
+
+INSERT INTO medical_reports (
+    report_number, medical_record_id, patient_id, doctor_id, report_title, report_type, report_date, clinical_findings, recommendations, summary, status
+)
+SELECT
+    'REP-10001',
+    mr.id,
+    p.id,
+    d.id,
+    'Cardiovascular Clinical Consultation Report',
+    'CONSULTATION_NOTE',
+    CURRENT_DATE,
+    'Patient presented with mild chest tightness and elevated blood pressure (138/88 mmHg). Cardiovascular examination revealed normal heart sounds S1 S2, no murmurs. ECG demonstrated normal sinus rhythm without ischemic changes.',
+    '1. Amlodipine 5mg once daily\n2. Low sodium diet\n3. Repeat ECG and lipid profile in 1 month\n4. Follow-up clinic review in 4 weeks',
+    'Essential hypertension well-tolerated on initial presentation. Commenced pharmacotherapy with positive prognosis.',
+    'FINALIZED'
+FROM patients p, doctors d, medical_records mr
+WHERE p.patient_number = 'PAT-10001' AND d.doctor_number = 'DOC-10001' AND mr.record_number = 'EMR-10001'
+ON CONFLICT (report_number) DO NOTHING;
+
+
 
