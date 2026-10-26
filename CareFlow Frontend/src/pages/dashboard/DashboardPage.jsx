@@ -4,6 +4,7 @@ import { Link } from 'react-router-dom'
 import { patientApi } from '../../features/patients/api/patientApi'
 import { doctorApi } from '../../features/doctors/api/doctorApi'
 import { appointmentApi } from '../../features/appointments/api/appointmentApi'
+import { labApi } from '../../features/lab/api/labApi'
 import {
   Users,
   Shield,
@@ -16,7 +17,8 @@ import {
   Clock,
   CheckCircle2,
   Building2,
-  Plus
+  Plus,
+  FlaskConical
 } from 'lucide-react'
 
 export default function DashboardPage() {
@@ -24,11 +26,13 @@ export default function DashboardPage() {
   const [patientStats, setPatientStats] = useState(null)
   const [doctorStats, setDoctorStats] = useState(null)
   const [appointmentStats, setAppointmentStats] = useState(null)
+  const [labStats, setLabStats] = useState(null)
 
   useEffect(() => {
     patientApi.getPatientStats().then(setPatientStats).catch(() => {})
     doctorApi.getDoctorStats().then(setDoctorStats).catch(() => {})
     appointmentApi.getAppointmentStats().then(setAppointmentStats).catch(() => {})
+    labApi.getSummaryStats().then(setLabStats).catch(() => {})
   }, [])
 
   return (
@@ -185,6 +189,58 @@ export default function DashboardPage() {
 
           <Link to="/appointments" className="btn btn-secondary" style={{ width: '100%', justifyContent: 'space-between' }}>
             <span>View Appointments & Calendar</span>
+            <ArrowRight size={16} />
+          </Link>
+        </div>
+
+        {/* Laboratory Management Card */}
+        <div className="card card-hover" style={{ display: 'flex', flexDirection: 'column', justifyContent: 'space-between', borderTop: '4px solid #0284c7' }}>
+          <div>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
+              <div style={{
+                display: 'inline-flex',
+                padding: '0.75rem',
+                borderRadius: 'var(--radius-md)',
+                backgroundColor: 'var(--primary-light)',
+                color: 'var(--primary)'
+              }}>
+                <FlaskConical size={28} />
+              </div>
+
+              {labStats && (
+                <div style={{ textAlign: 'right' }}>
+                  <div style={{ fontSize: '1.6rem', fontWeight: 800, color: 'var(--primary)' }}>
+                    {labStats.totalRequests}
+                  </div>
+                  <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', fontWeight: 600 }}>Lab Orders</div>
+                </div>
+              )}
+            </div>
+
+            <h2 style={{ fontSize: '1.25rem', fontWeight: 700, marginBottom: '0.5rem' }}>Laboratory Services</h2>
+            <p style={{ fontSize: '0.85rem', color: 'var(--text-muted)', marginBottom: '1.25rem' }}>
+              Process test requisitions, collect barcode specimens, quantify diagnostic results, and certify lab reports.
+            </p>
+
+            {labStats && (
+              <div style={{ display: 'flex', gap: '0.5rem', marginBottom: '1.5rem', flexWrap: 'wrap' }}>
+                <span style={{ fontSize: '0.75rem', background: '#eff6ff', color: '#1d4ed8', padding: '0.25rem 0.6rem', borderRadius: 'var(--radius-sm)', fontWeight: 600 }}>
+                  {labStats.requestedCount} Pending Collection
+                </span>
+                <span style={{ fontSize: '0.75rem', background: '#ecfdf5', color: '#047857', padding: '0.25rem 0.6rem', borderRadius: 'var(--radius-sm)', fontWeight: 600 }}>
+                  {labStats.completedCount} Completed
+                </span>
+                {labStats.urgentStatCount > 0 && (
+                  <span style={{ fontSize: '0.75rem', background: '#fee2e2', color: '#b91c1c', padding: '0.25rem 0.6rem', borderRadius: 'var(--radius-sm)', fontWeight: 700 }}>
+                    {labStats.urgentStatCount} STAT / Urgent
+                  </span>
+                )}
+              </div>
+            )}
+          </div>
+
+          <Link to="/laboratory" className="btn btn-primary" style={{ width: '100%', justifyContent: 'space-between' }}>
+            <span>Go to Laboratory</span>
             <ArrowRight size={16} />
           </Link>
         </div>
