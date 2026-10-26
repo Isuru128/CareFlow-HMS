@@ -880,5 +880,317 @@ FROM patients p, doctors d, medical_records mr
 WHERE p.patient_number = 'PAT-10001' AND d.doctor_number = 'DOC-10001' AND mr.record_number = 'EMR-10001'
 ON CONFLICT (report_number) DO NOTHING;
 
+-- ==============================================================================
+-- Module 3.6 - Laboratory Management
+-- ==============================================================================
+
+-- ------------------------------------------------------------------------------
+-- 18. LAB TESTS CATALOG TABLE
+-- Standard diagnostic tests offered by hospital laboratory with pricing and turnaround times.
+-- ------------------------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS lab_tests (
+    id BIGSERIAL PRIMARY KEY,
+    test_code VARCHAR(30) NOT NULL UNIQUE,
+    test_name VARCHAR(150) NOT NULL,
+    category VARCHAR(50) NOT NULL CHECK (
+        category IN ('HEMATOLOGY', 'BIOCHEMISTRY', 'IMMUNOLOGY', 'MICROBIOLOGY', 'PATHOLOGY', 'URINALYSIS', 'RADIOLOGY', 'OTHER')
+    ),
+    sample_type VARCHAR(50) NOT NULL CHECK (
+        sample_type IN ('BLOOD', 'SERUM', 'PLASMA', 'URINE', 'STOOL', 'SWAB', 'SPUTUM', 'CSF', 'TISSUE', 'OTHER')
+    ),
+    price NUMERIC(10, 2) NOT NULL DEFAULT 0.00,
+    turnaround_time_hours INT NOT NULL DEFAULT 24,
+    reference_range VARCHAR(150),
+    unit VARCHAR(50),
+    description TEXT,
+    is_active BOOLEAN NOT NULL DEFAULT TRUE,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+
+-- ------------------------------------------------------------------------------
+-- 19. LAB REQUESTS TABLE
+-- Diagnostic test requests ordered by physicians for inpatients or outpatients.
+-- ------------------------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS lab_requests (
+    id BIGSERIAL PRIMARY KEY,
+    request_number VARCHAR(30) NOT NULL UNIQUE,
+    patient_id BIGINT NOT NULL REFERENCES patients(id) ON DELETE CASCADE,
+    doctor_id BIGINT REFERENCES doctors(id) ON DELETE SET NULL,
+    medical_record_id BIGINT REFERENCES medical_records(id) ON DELETE SET NULL,
+    priority VARCHAR(20) NOT NULL DEFAULT 'ROUTINE' CHECK (
+        priority IN ('ROUTINE', 'URGENT', 'STAT')
+    ),
+    status VARCHAR(30) NOT NULL DEFAULT 'REQUESTED' CHECK (
+        status IN ('REQUESTED', 'SAMPLE_COLLECTED', 'IN_PROGRESS', 'COMPLETED', 'CANCELLED')
+    ),
+    clinical_notes TEXT,
+    requested_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    created_by BIGINT REFERENCES users(id) ON DELETE SET NULL,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+
+-- ------------------------------------------------------------------------------
+-- 20. LAB REQUEST ITEMS TABLE
+-- Individual laboratory tests included within a diagnostic request.
+-- ------------------------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS lab_request_items (
+    id BIGSERIAL PRIMARY KEY,
+    request_id BIGINT NOT NULL REFERENCES lab_requests(id) ON DELETE CASCADE,
+    lab_test_id BIGINT NOT NULL REFERENCES lab_tests(id) ON DELETE RESTRICT,
+    status VARCHAR(30) NOT NULL DEFAULT 'PENDING' CHECK (
+        status IN ('PENDING', 'SAMPLE_COLLECTED', 'PROCESSING', 'COMPLETED', 'CANCELLED')
+    ),
+    notes TEXT,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+
+-- ------------------------------------------------------------------------------
+-- 21. LAB SAMPLES TABLE
+-- Physical specimen collection, barcoding, and tracking records.
+-- ------------------------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS lab_samples (
+    id BIGSERIAL PRIMARY KEY,
+    sample_barcode VARCHAR(50) NOT NULL UNIQUE,
+    request_id BIGINT NOT NULL REFERENCES lab_requests(id) ON DELETE CASCADE,
+    sample_type VARCHAR(50) NOT NULL,
+    collected_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    collected_by BIGINT REFERENCES users(id) ON DELETE SET NULL,
+    collection_site VARCHAR(100),
+    status VARCHAR(30) NOT NULL DEFAULT 'COLLECTED' CHECK (
+        status IN ('COLLECTED', 'RECEIVED_IN_LAB', 'PROCESSING', 'REJECTED', 'DISPOSED')
+    ),
+    rejection_reason TEXT,
+    notes TEXT,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+
+-- ------------------------------------------------------------------------------
+-- 22. LAB RESULTS TABLE
+-- Quantitative and qualitative laboratory measurement values and findings.
+-- ------------------------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS lab_results (
+    id BIGSERIAL PRIMARY KEY,
+    request_item_id BIGINT NOT NULL REFERENCES lab_request_items(id) ON DELETE CASCADE,
+    parameter_name VARCHAR(100) NOT NULL,
+    result_value VARCHAR(100) NOT NULL,
+    reference_range VARCHAR(100),
+    unit VARCHAR(50),
+    flag VARCHAR(20) NOT NULL DEFAULT 'NORMAL' CHECK (
+        flag IN ('NORMAL', 'LOW', 'HIGH', 'CRITICAL', 'ABNORMAL')
+    ),
+    notes TEXT,
+    entered_by BIGINT REFERENCES users(id) ON DELETE SET NULL,
+    entered_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+
+-- ------------------------------------------------------------------------------
+-- 23. LAB REPORTS TABLE
+-- Verified and finalized clinical diagnostic laboratory reports.
+-- ------------------------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS lab_reports (
+    id BIGSERIAL PRIMARY KEY,
+    report_number VARCHAR(30) NOT NULL UNIQUE,
+    request_id BIGINT NOT NULL REFERENCES lab_requests(id) ON DELETE CASCADE,
+    generated_by BIGINT REFERENCES users(id) ON DELETE SET NULL,
+    verified_by BIGINT REFERENCES users(id) ON DELETE SET NULL,
+    report_date TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    summary TEXT,
+    comments TEXT,
+    status VARCHAR(20) NOT NULL DEFAULT 'PRELIMINARY' CHECK (
+        status IN ('PRELIMINARY', 'FINALIZED', 'AMENDED')
+    ),
+    created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+
+-- ------------------------------------------------------------------------------
+-- INDEXES FOR LABORATORY MODULE
+-- ------------------------------------------------------------------------------
+CREATE INDEX IF NOT EXISTS idx_lab_tests_code ON lab_tests(test_code);
+CREATE INDEX IF NOT EXISTS idx_lab_tests_category ON lab_tests(category);
+CREATE INDEX IF NOT EXISTS idx_lab_requests_number ON lab_requests(request_number);
+CREATE INDEX IF NOT EXISTS idx_lab_requests_patient ON lab_requests(patient_id);
+CREATE INDEX IF NOT EXISTS idx_lab_requests_doctor ON lab_requests(doctor_id);
+CREATE INDEX IF NOT EXISTS idx_lab_requests_status ON lab_requests(status);
+CREATE INDEX IF NOT EXISTS idx_lab_requests_priority ON lab_requests(priority);
+CREATE INDEX IF NOT EXISTS idx_lab_request_items_req ON lab_request_items(request_id);
+CREATE INDEX IF NOT EXISTS idx_lab_samples_barcode ON lab_samples(sample_barcode);
+CREATE INDEX IF NOT EXISTS idx_lab_samples_request ON lab_samples(request_id);
+CREATE INDEX IF NOT EXISTS idx_lab_results_item ON lab_results(request_item_id);
+CREATE INDEX IF NOT EXISTS idx_lab_reports_number ON lab_reports(report_number);
+CREATE INDEX IF NOT EXISTS idx_lab_reports_request ON lab_reports(request_id);
+
+-- ------------------------------------------------------------------------------
+-- SEED DATA: LABORATORY CATALOG, TEST REQUEST, SAMPLE, RESULTS & REPORT
+-- ------------------------------------------------------------------------------
+INSERT INTO lab_tests (test_code, test_name, category, sample_type, price, turnaround_time_hours, reference_range, unit, description, is_active)
+VALUES
+('LAB-CBC', 'Complete Blood Count (CBC)', 'HEMATOLOGY', 'BLOOD', 1500.00, 4, 'Varies by parameter', NULL, 'Comprehensive evaluation of RBC, WBC, Hemoglobin, Hematocrit and Platelet indices', TRUE),
+('LAB-FBS', 'Fasting Blood Sugar (FBS)', 'BIOCHEMISTRY', 'BLOOD', 500.00, 2, '70.0 - 99.0', 'mg/dL', 'Measures blood glucose concentration following minimum 8-hour fasting period', TRUE),
+('LAB-LIPID', 'Lipid Profile', 'BIOCHEMISTRY', 'BLOOD', 2200.00, 6, 'Cholesterol < 200, Triglycerides < 150', 'mg/dL', 'Serum lipids including Total Cholesterol, HDL, LDL, VLDL, and Triglycerides', TRUE),
+('LAB-LFT', 'Liver Function Test (LFT)', 'BIOCHEMISTRY', 'SERUM', 2500.00, 6, 'SGOT 15-40, SGPT 10-49, Bilirubin 0.2-1.2', 'U/L', 'Enzymatic screen of hepatic parenchymal integrity and biliary excretory capacity', TRUE),
+('LAB-CREAT', 'Serum Creatinine & eGFR', 'BIOCHEMISTRY', 'SERUM', 800.00, 3, '0.7 - 1.3', 'mg/dL', 'Renal clearance and glomerular filtration capacity biomarker', TRUE),
+('LAB-HBA1C', 'Glycated Hemoglobin (HbA1c)', 'HEMATOLOGY', 'BLOOD', 1800.00, 6, '4.0 - 5.6', '%', 'Long-term glycemic control evaluation reflecting average 3-month blood sugar', TRUE),
+('LAB-URINE', 'Urinalysis (Full Routine)', 'URINALYSIS', 'URINE', 600.00, 2, 'Yellow, Clear, pH 5.0-8.0, SG 1.005-1.030', NULL, 'Physical, chemical, and microscopic sediment analysis of clean catch urine', TRUE),
+('LAB-TSH', 'Thyroid Stimulating Hormone (TSH)', 'IMMUNOLOGY', 'SERUM', 1600.00, 8, '0.40 - 4.50', 'uIU/mL', 'Hypothalamic-pituitary-thyroid axis biomarker for hypothyroidism or hyperthyroidism', TRUE),
+('LAB-CRP', 'C-Reactive Protein (Quantitative)', 'IMMUNOLOGY', 'SERUM', 1200.00, 4, '< 5.0', 'mg/L', 'Acute-phase reactant marker indicating systemic inflammatory and infectious states', TRUE),
+('LAB-COVID', 'SARS-CoV-2 Antigen Rapid Test', 'MICROBIOLOGY', 'SWAB', 1200.00, 1, 'Negative', NULL, 'Rapid qualitative immunochromatographic assay for viral nucleocapsid antigen', TRUE)
+ON CONFLICT (test_code) DO NOTHING;
+
+-- Seed Sample Request for PAT-10001
+INSERT INTO lab_requests (
+    request_number, patient_id, doctor_id, priority, status, clinical_notes, requested_at
+)
+SELECT
+    'LRQ-10001',
+    p.id,
+    d.id,
+    'URGENT',
+    'COMPLETED',
+    'Patient with stage 1 hypertension and mild chest tightness. Routine baseline hematology and fasting lipid assessment requested.',
+    CURRENT_TIMESTAMP - INTERVAL '1 day'
+FROM patients p, doctors d
+WHERE p.patient_number = 'PAT-10001' AND d.doctor_number = 'DOC-10001'
+ON CONFLICT (request_number) DO NOTHING;
+
+-- Seed Sample Request Items
+INSERT INTO lab_request_items (request_id, lab_test_id, status, notes)
+SELECT
+    lr.id,
+    lt.id,
+    'COMPLETED',
+    'Priority processing requested by cardiologist'
+FROM lab_requests lr, lab_tests lt
+WHERE lr.request_number = 'LRQ-10001' AND lt.test_code IN ('LAB-CBC', 'LAB-LIPID')
+ON CONFLICT DO NOTHING;
+
+-- Seed Sample Collection
+INSERT INTO lab_samples (sample_barcode, request_id, sample_type, collected_at, collection_site, status, notes)
+SELECT
+    'SMP-20261026-0001',
+    lr.id,
+    'BLOOD',
+    CURRENT_TIMESTAMP - INTERVAL '20 hours',
+    'Left antecubital fossa',
+    'RECEIVED_IN_LAB',
+    'Collected in EDTA tube and SST Gel tube without hemolysis'
+FROM lab_requests lr
+WHERE lr.request_number = 'LRQ-10001'
+ON CONFLICT (sample_barcode) DO NOTHING;
+
+-- Seed Result Parameters for CBC
+INSERT INTO lab_results (request_item_id, parameter_name, result_value, reference_range, unit, flag, notes)
+SELECT
+    lri.id,
+    'Hemoglobin',
+    '14.5',
+    '13.0 - 17.0',
+    'g/dL',
+    'NORMAL',
+    'Optimal oxygen carrying capacity'
+FROM lab_request_items lri
+JOIN lab_requests lr ON lri.request_id = lr.id
+JOIN lab_tests lt ON lri.lab_test_id = lt.id
+WHERE lr.request_number = 'LRQ-10001' AND lt.test_code = 'LAB-CBC'
+ON CONFLICT DO NOTHING;
+
+INSERT INTO lab_results (request_item_id, parameter_name, result_value, reference_range, unit, flag, notes)
+SELECT
+    lri.id,
+    'White Blood Cells (WBC)',
+    '7,200',
+    '4,500 - 11,000',
+    '/uL',
+    'NORMAL',
+    'Normal total leukocyte count'
+FROM lab_request_items lri
+JOIN lab_requests lr ON lri.request_id = lr.id
+JOIN lab_tests lt ON lri.lab_test_id = lt.id
+WHERE lr.request_number = 'LRQ-10001' AND lt.test_code = 'LAB-CBC'
+ON CONFLICT DO NOTHING;
+
+INSERT INTO lab_results (request_item_id, parameter_name, result_value, reference_range, unit, flag, notes)
+SELECT
+    lri.id,
+    'Platelets',
+    '265,000',
+    '150,000 - 450,000',
+    '/uL',
+    'NORMAL',
+    'Platelet aggregation normal'
+FROM lab_request_items lri
+JOIN lab_requests lr ON lri.request_id = lr.id
+JOIN lab_tests lt ON lri.lab_test_id = lt.id
+WHERE lr.request_number = 'LRQ-10001' AND lt.test_code = 'LAB-CBC'
+ON CONFLICT DO NOTHING;
+
+-- Seed Result Parameters for Lipid Profile
+INSERT INTO lab_results (request_item_id, parameter_name, result_value, reference_range, unit, flag, notes)
+SELECT
+    lri.id,
+    'Total Cholesterol',
+    '228.0',
+    '< 200.0',
+    'mg/dL',
+    'HIGH',
+    'Borderline elevated total cholesterol'
+FROM lab_request_items lri
+JOIN lab_requests lr ON lri.request_id = lr.id
+JOIN lab_tests lt ON lri.lab_test_id = lt.id
+WHERE lr.request_number = 'LRQ-10001' AND lt.test_code = 'LAB-LIPID'
+ON CONFLICT DO NOTHING;
+
+INSERT INTO lab_results (request_item_id, parameter_name, result_value, reference_range, unit, flag, notes)
+SELECT
+    lri.id,
+    'Triglycerides',
+    '175.0',
+    '< 150.0',
+    'mg/dL',
+    'HIGH',
+    'Mild hypertriglyceridemia'
+FROM lab_request_items lri
+JOIN lab_requests lr ON lri.request_id = lr.id
+JOIN lab_tests lt ON lri.lab_test_id = lt.id
+WHERE lr.request_number = 'LRQ-10001' AND lt.test_code = 'LAB-LIPID'
+ON CONFLICT DO NOTHING;
+
+INSERT INTO lab_results (request_item_id, parameter_name, result_value, reference_range, unit, flag, notes)
+SELECT
+    lri.id,
+    'HDL Cholesterol',
+    '44.0',
+    '> 40.0',
+    'mg/dL',
+    'NORMAL',
+    'Adequate protective high-density lipoprotein level'
+FROM lab_request_items lri
+JOIN lab_requests lr ON lri.request_id = lr.id
+JOIN lab_tests lt ON lri.lab_test_id = lt.id
+WHERE lr.request_number = 'LRQ-10001' AND lt.test_code = 'LAB-LIPID'
+ON CONFLICT DO NOTHING;
+
+-- Seed Finalized Diagnostic Report
+INSERT INTO lab_reports (
+    report_number, request_id, report_date, summary, comments, status
+)
+SELECT
+    'LRPT-10001',
+    lr.id,
+    CURRENT_TIMESTAMP - INTERVAL '6 hours',
+    'Hematology profile unremarkable with normal hemoglobin and leukocyte levels. Lipid panel demonstrates moderate hypercholesterolemia and mild hypertriglyceridemia.',
+    'Correlate with cardiovascular risk assessment. Dietary lipid moderation and follow-up lipid screening advised in 8 weeks.',
+    'FINALIZED'
+FROM lab_requests lr
+WHERE lr.request_number = 'LRQ-10001'
+ON CONFLICT (report_number) DO NOTHING;
+
+
 
 
