@@ -1193,6 +1193,424 @@ FROM lab_requests lr
 WHERE lr.request_number = 'LRQ-10001'
 ON CONFLICT (report_number) DO NOTHING;
 
+-- ==============================================================================
+-- Module 3.7 - Pharmacy Management
+-- ==============================================================================
+
+-- ------------------------------------------------------------------------------
+-- 24. MEDICINES TABLE (INVENTORY & DRUG CATALOG)
+-- Core formulary and medicine master maintaining drug specifications, classifications,
+-- pricing, and minimum stock threshold levels.
+-- ------------------------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS medicines (
+    id BIGSERIAL PRIMARY KEY,
+    medicine_code VARCHAR(30) NOT NULL UNIQUE,
+    name VARCHAR(150) NOT NULL,
+    generic_name VARCHAR(150) NOT NULL,
+    brand_name VARCHAR(150),
+    category VARCHAR(50) NOT NULL CHECK (
+        category IN (
+            'ANALGESIC',
+            'ANTIBIOTIC',
+            'ANTIHYPERTENSIVE',
+            'ANTIDIABETIC',
+            'ANTIHISTAMINE',
+            'ANTIPYRETIC',
+            'GASTROINTESTINAL',
+            'CARDIOVASCULAR',
+            'RESPIRATORY',
+            'DERMATOLOGICAL',
+            'VITAMINS_SUPPLEMENTS',
+            'OTHER'
+        )
+    ),
+    dosage_form VARCHAR(50) NOT NULL CHECK (
+        dosage_form IN (
+            'TABLET',
+            'CAPSULE',
+            'SYRUP',
+            'INJECTION',
+            'SUSPENSION',
+            'OINTMENT',
+            'DROPS',
+            'INHALER',
+            'SUPPOSITORY',
+            'OTHER'
+        )
+    ),
+    strength VARCHAR(50) NOT NULL,
+    unit_of_measure VARCHAR(30) NOT NULL DEFAULT 'TABLET' CHECK (
+        unit_of_measure IN ('TABLET', 'CAPSULE', 'BOTTLE', 'STRIP', 'VIAL', 'AMPOULE', 'TUBE', 'BOX', 'PIECE')
+    ),
+    unit_price NUMERIC(10, 2) NOT NULL DEFAULT 0.00,
+    reorder_level INT NOT NULL DEFAULT 50,
+    manufacturer VARCHAR(150),
+    storage_conditions VARCHAR(150) DEFAULT 'Store below 25°C in a dry place',
+    description TEXT,
+    side_effects TEXT,
+    is_active BOOLEAN NOT NULL DEFAULT TRUE,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+
+-- ------------------------------------------------------------------------------
+-- 25. MEDICINE BATCHES TABLE (STOCK & EXPIRY TRACKING)
+-- Tracks specific procurement lots, supplier information, purchase costs,
+-- manufacturing/expiration dates, and remaining physical stock for FEFO management.
+-- ------------------------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS medicine_batches (
+    id BIGSERIAL PRIMARY KEY,
+    batch_number VARCHAR(50) NOT NULL,
+    medicine_id BIGINT NOT NULL REFERENCES medicines(id) ON DELETE CASCADE,
+    manufacture_date DATE,
+    expiry_date DATE NOT NULL,
+    initial_quantity INT NOT NULL CHECK (initial_quantity >= 0),
+    current_quantity INT NOT NULL CHECK (current_quantity >= 0),
+    unit_purchase_price NUMERIC(10, 2) NOT NULL DEFAULT 0.00,
+    unit_selling_price NUMERIC(10, 2) NOT NULL DEFAULT 0.00,
+    supplier_name VARCHAR(150),
+    received_date DATE NOT NULL DEFAULT CURRENT_DATE,
+    status VARCHAR(30) NOT NULL DEFAULT 'ACTIVE' CHECK (
+        status IN ('ACTIVE', 'EXPIRED', 'DEPLETED', 'RECALLED')
+    ),
+    notes TEXT,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    CONSTRAINT uq_medicine_batch UNIQUE (medicine_id, batch_number)
+);
+
+-- ------------------------------------------------------------------------------
+-- 26. PHARMACY DISPENSATIONS TABLE (PRESCRIPTION FULFILLMENT & OTC SALES)
+-- Header records documenting prescription-based or direct over-the-counter dispensing,
+-- pharmacist accountability, and financial totals.
+-- ------------------------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS pharmacy_dispensations (
+    id BIGSERIAL PRIMARY KEY,
+    dispensation_number VARCHAR(30) NOT NULL UNIQUE,
+    prescription_id BIGINT REFERENCES prescriptions(id) ON DELETE SET NULL,
+    patient_id BIGINT REFERENCES patients(id) ON DELETE SET NULL,
+    patient_name VARCHAR(150) NOT NULL,
+    doctor_name VARCHAR(150),
+    dispensed_by BIGINT REFERENCES users(id) ON DELETE SET NULL,
+    dispensed_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    total_amount NUMERIC(10, 2) NOT NULL DEFAULT 0.00,
+    payment_status VARCHAR(30) NOT NULL DEFAULT 'PAID' CHECK (
+        payment_status IN ('PAID', 'PENDING', 'WAIVED')
+    ),
+    status VARCHAR(30) NOT NULL DEFAULT 'COMPLETED' CHECK (
+        status IN ('COMPLETED', 'CANCELLED', 'REFUNDED')
+    ),
+    notes TEXT,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+
+-- ------------------------------------------------------------------------------
+-- 27. PHARMACY DISPENSATION ITEMS TABLE
+-- Line items of medications issued under a dispensation, mapped to the specific batch.
+-- ------------------------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS pharmacy_dispensation_items (
+    id BIGSERIAL PRIMARY KEY,
+    dispensation_id BIGINT NOT NULL REFERENCES pharmacy_dispensations(id) ON DELETE CASCADE,
+    medicine_id BIGINT NOT NULL REFERENCES medicines(id) ON DELETE RESTRICT,
+    batch_id BIGINT REFERENCES medicine_batches(id) ON DELETE SET NULL,
+    prescription_item_id BIGINT REFERENCES prescription_items(id) ON DELETE SET NULL,
+    quantity INT NOT NULL CHECK (quantity > 0),
+    unit_price NUMERIC(10, 2) NOT NULL DEFAULT 0.00,
+    subtotal NUMERIC(10, 2) NOT NULL DEFAULT 0.00,
+    dosage_instructions TEXT,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+
+-- ------------------------------------------------------------------------------
+-- 28. PHARMACY STOCK TRANSACTIONS TABLE
+-- Complete inventory ledger logging every quantity change, adjustment, and disposal.
+-- ------------------------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS pharmacy_stock_transactions (
+    id BIGSERIAL PRIMARY KEY,
+    medicine_id BIGINT NOT NULL REFERENCES medicines(id) ON DELETE CASCADE,
+    batch_id BIGINT REFERENCES medicine_batches(id) ON DELETE SET NULL,
+    transaction_type VARCHAR(30) NOT NULL CHECK (
+        transaction_type IN ('PURCHASE_RECEIPT', 'DISPENSE', 'RETURN', 'STOCK_ADJUSTMENT', 'DISPOSAL_EXPIRED')
+    ),
+    quantity INT NOT NULL,
+    balance_after INT NOT NULL,
+    reference_number VARCHAR(100),
+    notes TEXT,
+    performed_by BIGINT REFERENCES users(id) ON DELETE SET NULL,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+
+-- ------------------------------------------------------------------------------
+-- INDEXES FOR PHARMACY MODULE
+-- ------------------------------------------------------------------------------
+CREATE INDEX IF NOT EXISTS idx_medicines_code ON medicines(medicine_code);
+CREATE INDEX IF NOT EXISTS idx_medicines_name ON medicines(name);
+CREATE INDEX IF NOT EXISTS idx_medicines_generic ON medicines(generic_name);
+CREATE INDEX IF NOT EXISTS idx_medicines_category ON medicines(category);
+CREATE INDEX IF NOT EXISTS idx_medicines_active ON medicines(is_active);
+
+CREATE INDEX IF NOT EXISTS idx_medicine_batches_medicine ON medicine_batches(medicine_id);
+CREATE INDEX IF NOT EXISTS idx_medicine_batches_batch_num ON medicine_batches(batch_number);
+CREATE INDEX IF NOT EXISTS idx_medicine_batches_expiry ON medicine_batches(expiry_date);
+CREATE INDEX IF NOT EXISTS idx_medicine_batches_status ON medicine_batches(status);
+
+CREATE INDEX IF NOT EXISTS idx_pharmacy_dispensations_number ON pharmacy_dispensations(dispensation_number);
+CREATE INDEX IF NOT EXISTS idx_pharmacy_dispensations_presc ON pharmacy_dispensations(prescription_id);
+CREATE INDEX IF NOT EXISTS idx_pharmacy_dispensations_patient ON pharmacy_dispensations(patient_id);
+CREATE INDEX IF NOT EXISTS idx_pharmacy_dispensations_date ON pharmacy_dispensations(dispensed_at);
+
+CREATE INDEX IF NOT EXISTS idx_dispensation_items_disp ON pharmacy_dispensation_items(dispensation_id);
+CREATE INDEX IF NOT EXISTS idx_dispensation_items_med ON pharmacy_dispensation_items(medicine_id);
+CREATE INDEX IF NOT EXISTS idx_dispensation_items_batch ON pharmacy_dispensation_items(batch_id);
+
+CREATE INDEX IF NOT EXISTS idx_stock_tx_med ON pharmacy_stock_transactions(medicine_id);
+CREATE INDEX IF NOT EXISTS idx_stock_tx_batch ON pharmacy_stock_transactions(batch_id);
+CREATE INDEX IF NOT EXISTS idx_stock_tx_date ON pharmacy_stock_transactions(created_at);
+
+-- ------------------------------------------------------------------------------
+-- TRIGGERS FOR TIMESTAMP UPDATES
+-- ------------------------------------------------------------------------------
+DROP TRIGGER IF EXISTS trg_update_medicines_timestamp ON medicines;
+CREATE TRIGGER trg_update_medicines_timestamp
+BEFORE UPDATE ON medicines
+FOR EACH ROW
+EXECUTE FUNCTION update_timestamp_column();
+
+DROP TRIGGER IF EXISTS trg_update_medicine_batches_timestamp ON medicine_batches;
+CREATE TRIGGER trg_update_medicine_batches_timestamp
+BEFORE UPDATE ON medicine_batches
+FOR EACH ROW
+EXECUTE FUNCTION update_timestamp_column();
+
+DROP TRIGGER IF EXISTS trg_update_pharmacy_dispensations_timestamp ON pharmacy_dispensations;
+CREATE TRIGGER trg_update_pharmacy_dispensations_timestamp
+BEFORE UPDATE ON pharmacy_dispensations
+FOR EACH ROW
+EXECUTE FUNCTION update_timestamp_column();
+
+-- ------------------------------------------------------------------------------
+-- SEED DATA: PHARMACY MEDICINES FORMULARY
+-- ------------------------------------------------------------------------------
+INSERT INTO medicines (
+    medicine_code, name, generic_name, brand_name, category, dosage_form,
+    strength, unit_of_measure, unit_price, reorder_level, manufacturer,
+    storage_conditions, description, side_effects, is_active
+) VALUES
+('MED-10001', 'Paracetamol 500mg', 'Paracetamol', 'Panadol', 'ANALGESIC', 'TABLET', '500 mg', 'TABLET', 5.00, 200, 'GSK Healthcare', 'Store below 30°C in dry place', 'Antipyretic and mild analgesic indicated for fever and mild to moderate pain.', 'Rare nausea, hypersensitivity reactions.', TRUE),
+('MED-10002', 'Amoxicillin 500mg', 'Amoxicillin Trihydrate', 'Amoxil', 'ANTIBIOTIC', 'CAPSULE', '500 mg', 'CAPSULE', 25.00, 100, 'Pfizer Ltd', 'Store below 25°C protected from moisture', 'Broad spectrum penicillin antibiotic indicated for respiratory and ENT bacterial infections.', 'Nausea, diarrhea, allergic skin rash.', TRUE),
+('MED-10003', 'Amlodipine 5mg', 'Amlodipine Besylate', 'Norvasc', 'ANTIHYPERTENSIVE', 'TABLET', '5 mg', 'TABLET', 18.00, 150, 'Novartis Pharma', 'Store at room temperature 15-30°C', 'Calcium channel blocker for essential hypertension and chronic stable angina.', 'Peripheral edema, flushing, headache, dizziness.', TRUE),
+('MED-10004', 'Metformin 500mg', 'Metformin Hydrochloride', 'Glucophage', 'ANTIDIABETIC', 'TABLET', '500 mg', 'TABLET', 12.00, 150, 'Merck Sante', 'Store below 25°C', 'Biguanide antihyperglycemic agent for Type 2 Diabetes Mellitus management.', 'Gastrointestinal upset, metallic taste, lactic acidosis (rare).', TRUE),
+('MED-10005', 'Omeprazole 20mg', 'Omeprazole', 'Losec', 'GASTROINTESTINAL', 'CAPSULE', '20 mg', 'CAPSULE', 22.00, 100, 'AstraZeneca', 'Store in tight container away from moisture', 'Proton pump inhibitor (PPI) for GERD, dyspepsia, and peptic ulcer disease.', 'Headache, abdominal pain, flatulence, constipation.', TRUE),
+('MED-10006', 'Cetirizine 10mg', 'Cetirizine Dihydrochloride', 'Zyrtec', 'ANTIHISTAMINE', 'TABLET', '10 mg', 'TABLET', 15.00, 80, 'Johnson & Johnson', 'Store below 30°C', 'Second generation H1-antihistamine for allergic rhinitis, urticaria, and pruritus.', 'Mild drowsiness, dry mouth, fatigue.', TRUE),
+('MED-10007', 'Atorvastatin 20mg', 'Atorvastatin Calcium', 'Lipitor', 'CARDIOVASCULAR', 'TABLET', '20 mg', 'TABLET', 45.00, 80, 'Pfizer Ltd', 'Store between 20-25°C', 'HMG-CoA reductase inhibitor statin indicated for dyslipidemia and cardiovascular prevention.', 'Myalgia, headache, mild elevation in liver enzymes.', TRUE),
+('MED-10008', 'Salbutamol Inhaler 100mcg', 'Salbutamol Sulfate', 'Ventolin Evohaler', 'RESPIRATORY', 'INHALER', '100 mcg/dose', 'PIECE', 650.00, 20, 'GSK Healthcare', 'Do not freeze or expose to direct heat', 'Short-acting beta-2 adrenergic agonist bronchodilator for acute asthma bronchospasm.', 'Fine tremors, tachycardia, mild palpitations.', TRUE),
+('MED-10009', 'Azithromycin 500mg', 'Azithromycin', 'Zithromax', 'ANTIBIOTIC', 'TABLET', '500 mg', 'TABLET', 95.00, 50, 'Pfizer Ltd', 'Store below 30°C', 'Macrolide antibiotic for community-acquired pneumonia and atypical bacterial infections.', 'Gastrointestinal cramping, nausea, diarrhea.', TRUE),
+('MED-10010', 'Vitamin C 500mg', 'Ascorbic Acid', 'C-Vite', 'VITAMINS_SUPPLEMENTS', 'TABLET', '500 mg', 'TABLET', 8.00, 200, 'Astron Health', 'Keep tightly closed in a cool dry area', 'Antioxidant and essential vitamin for immune defense and connective tissue repair.', 'Minimal side effects at recommended dosages.', TRUE),
+('MED-10011', 'Aspirin 75mg', 'Acetylsalicylic Acid', 'Cardiprin', 'CARDIOVASCULAR', 'TABLET', '75 mg', 'TABLET', 10.00, 150, 'Bayer AG', 'Store below 25°C', 'Antiplatelet agent for secondary prevention of thromboembolic and ischemic heart events.', 'Gastric irritation, micro-bleeding risk.', TRUE)
+ON CONFLICT (medicine_code) DO NOTHING;
+
+-- ------------------------------------------------------------------------------
+-- SEED DATA: MEDICINE BATCHES (STOCK, FEFO & EXPIRY MONITORING EXAMPLES)
+-- ------------------------------------------------------------------------------
+-- Active batch for Paracetamol (Plenty of stock)
+INSERT INTO medicine_batches (
+    batch_number, medicine_id, manufacture_date, expiry_date,
+    initial_quantity, current_quantity, unit_purchase_price, unit_selling_price,
+    supplier_name, received_date, status, notes
+)
+SELECT
+    'BAT-2026-PARA01', m.id, CURRENT_DATE - INTERVAL '6 months', CURRENT_DATE + INTERVAL '18 months',
+    1000, 850, 3.20, 5.00, 'State Pharmaceuticals Corp', CURRENT_DATE - INTERVAL '5 months', 'ACTIVE', 'Prime inventory batch'
+FROM medicines m WHERE m.medicine_code = 'MED-10001'
+ON CONFLICT (medicine_id, batch_number) DO NOTHING;
+
+-- Amoxicillin: Batch 1 expiring in 25 days (EXPIRING SOON alert test)
+INSERT INTO medicine_batches (
+    batch_number, medicine_id, manufacture_date, expiry_date,
+    initial_quantity, current_quantity, unit_purchase_price, unit_selling_price,
+    supplier_name, received_date, status, notes
+)
+SELECT
+    'BAT-2025-AMX01', m.id, CURRENT_DATE - INTERVAL '18 months', CURRENT_DATE + INTERVAL '25 days',
+    500, 120, 18.00, 25.00, 'MediLink Distributors', CURRENT_DATE - INTERVAL '17 months', 'ACTIVE', 'Nearing expiry - prioritize FEFO dispensing'
+FROM medicines m WHERE m.medicine_code = 'MED-10002'
+ON CONFLICT (medicine_id, batch_number) DO NOTHING;
+
+-- Amoxicillin: Fresh batch expiring in 14 months
+INSERT INTO medicine_batches (
+    batch_number, medicine_id, manufacture_date, expiry_date,
+    initial_quantity, current_quantity, unit_purchase_price, unit_selling_price,
+    supplier_name, received_date, status, notes
+)
+SELECT
+    'BAT-2026-AMX02', m.id, CURRENT_DATE - INTERVAL '2 months', CURRENT_DATE + INTERVAL '14 months',
+    600, 600, 19.50, 25.00, 'MediLink Distributors', CURRENT_DATE - INTERVAL '1 month', 'ACTIVE', 'New replenishment consignment'
+FROM medicines m WHERE m.medicine_code = 'MED-10002'
+ON CONFLICT (medicine_id, batch_number) DO NOTHING;
+
+-- Amlodipine 5mg: Normal active batch
+INSERT INTO medicine_batches (
+    batch_number, medicine_id, manufacture_date, expiry_date,
+    initial_quantity, current_quantity, unit_purchase_price, unit_selling_price,
+    supplier_name, received_date, status, notes
+)
+SELECT
+    'BAT-2026-AML01', m.id, CURRENT_DATE - INTERVAL '4 months', CURRENT_DATE + INTERVAL '16 months',
+    800, 520, 12.00, 18.00, 'PharmaNet Lanka', CURRENT_DATE - INTERVAL '3 months', 'ACTIVE', 'Good stock level'
+FROM medicines m WHERE m.medicine_code = 'MED-10003'
+ON CONFLICT (medicine_id, batch_number) DO NOTHING;
+
+-- Metformin 500mg: Active batch
+INSERT INTO medicine_batches (
+    batch_number, medicine_id, manufacture_date, expiry_date,
+    initial_quantity, current_quantity, unit_purchase_price, unit_selling_price,
+    supplier_name, received_date, status, notes
+)
+SELECT
+    'BAT-2026-MET01', m.id, CURRENT_DATE - INTERVAL '5 months', CURRENT_DATE + INTERVAL '12 months',
+    500, 310, 8.50, 12.00, 'Merck Direct', CURRENT_DATE - INTERVAL '4 months', 'ACTIVE', 'Routine clinic issue'
+FROM medicines m WHERE m.medicine_code = 'MED-10004'
+ON CONFLICT (medicine_id, batch_number) DO NOTHING;
+
+-- Omeprazole 20mg: Active batch
+INSERT INTO medicine_batches (
+    batch_number, medicine_id, manufacture_date, expiry_date,
+    initial_quantity, current_quantity, unit_purchase_price, unit_selling_price,
+    supplier_name, received_date, status, notes
+)
+SELECT
+    'BAT-2026-OMP01', m.id, CURRENT_DATE - INTERVAL '3 months', CURRENT_DATE + INTERVAL '20 months',
+    400, 260, 14.00, 22.00, 'AstraZeneca Imports', CURRENT_DATE - INTERVAL '2 months', 'ACTIVE', 'Standard stock'
+FROM medicines m WHERE m.medicine_code = 'MED-10005'
+ON CONFLICT (medicine_id, batch_number) DO NOTHING;
+
+-- Cetirizine 10mg: Batch already EXPIRED 15 days ago (EXPIRED alert test)
+INSERT INTO medicine_batches (
+    batch_number, medicine_id, manufacture_date, expiry_date,
+    initial_quantity, current_quantity, unit_purchase_price, unit_selling_price,
+    supplier_name, received_date, status, notes
+)
+SELECT
+    'BAT-2024-CET-EXP', m.id, CURRENT_DATE - INTERVAL '25 months', CURRENT_DATE - INTERVAL '15 days',
+    300, 45, 9.00, 15.00, 'Johnson Distribution', CURRENT_DATE - INTERVAL '24 months', 'EXPIRED', 'Expired lot marked for safe bio-disposal'
+FROM medicines m WHERE m.medicine_code = 'MED-10006'
+ON CONFLICT (medicine_id, batch_number) DO NOTHING;
+
+-- Cetirizine 10mg: Fresh replacement batch
+INSERT INTO medicine_batches (
+    batch_number, medicine_id, manufacture_date, expiry_date,
+    initial_quantity, current_quantity, unit_purchase_price, unit_selling_price,
+    supplier_name, received_date, status, notes
+)
+SELECT
+    'BAT-2026-CET02', m.id, CURRENT_DATE - INTERVAL '1 month', CURRENT_DATE + INTERVAL '22 months',
+    500, 480, 9.50, 15.00, 'Johnson Distribution', CURRENT_DATE - INTERVAL '15 days', 'ACTIVE', 'Active inventory'
+FROM medicines m WHERE m.medicine_code = 'MED-10006'
+ON CONFLICT (medicine_id, batch_number) DO NOTHING;
+
+-- Salbutamol Inhaler: LOW STOCK demonstration (current_quantity 8, reorder level 20)
+INSERT INTO medicine_batches (
+    batch_number, medicine_id, manufacture_date, expiry_date,
+    initial_quantity, current_quantity, unit_purchase_price, unit_selling_price,
+    supplier_name, received_date, status, notes
+)
+SELECT
+    'BAT-2026-SLB01', m.id, CURRENT_DATE - INTERVAL '6 months', CURRENT_DATE + INTERVAL '10 months',
+    50, 8, 480.00, 650.00, 'GSK Lanka', CURRENT_DATE - INTERVAL '5 months', 'ACTIVE', 'Low stock alert triggered - replenishment requested'
+FROM medicines m WHERE m.medicine_code = 'MED-10008'
+ON CONFLICT (medicine_id, batch_number) DO NOTHING;
+
+-- Aspirin 75mg: Batch for cardiovascular clinic
+INSERT INTO medicine_batches (
+    batch_number, medicine_id, manufacture_date, expiry_date,
+    initial_quantity, current_quantity, unit_purchase_price, unit_selling_price,
+    supplier_name, received_date, status, notes
+)
+SELECT
+    'BAT-2026-ASP01', m.id, CURRENT_DATE - INTERVAL '3 months', CURRENT_DATE + INTERVAL '15 months',
+    600, 450, 6.00, 10.00, 'Bayer Lanka', CURRENT_DATE - INTERVAL '2 months', 'ACTIVE', 'Regular issue'
+FROM medicines m WHERE m.medicine_code = 'MED-10011'
+ON CONFLICT (medicine_id, batch_number) DO NOTHING;
+
+-- ------------------------------------------------------------------------------
+-- SEED DATA: INITIAL STOCK TRANSACTIONS (AUDIT LEDGER)
+-- ------------------------------------------------------------------------------
+INSERT INTO pharmacy_stock_transactions (
+    medicine_id, batch_id, transaction_type, quantity, balance_after, reference_number, notes
+)
+SELECT
+    m.id, b.id, 'PURCHASE_RECEIPT', 1000, 1000, 'PO-2026-001', 'Initial consignment delivery'
+FROM medicines m
+JOIN medicine_batches b ON b.medicine_id = m.id AND b.batch_number = 'BAT-2026-PARA01'
+WHERE m.medicine_code = 'MED-10001'
+ON CONFLICT DO NOTHING;
+
+INSERT INTO pharmacy_stock_transactions (
+    medicine_id, batch_id, transaction_type, quantity, balance_after, reference_number, notes
+)
+SELECT
+    m.id, b.id, 'PURCHASE_RECEIPT', 800, 800, 'PO-2026-002', 'Initial shipment'
+FROM medicines m
+JOIN medicine_batches b ON b.medicine_id = m.id AND b.batch_number = 'BAT-2026-AML01'
+WHERE m.medicine_code = 'MED-10003'
+ON CONFLICT DO NOTHING;
+
+-- ------------------------------------------------------------------------------
+-- SEED DATA: SAMPLE PHARMACY DISPENSATION
+-- ------------------------------------------------------------------------------
+INSERT INTO pharmacy_dispensations (
+    dispensation_number, prescription_id, patient_id, patient_name, doctor_name,
+    dispensed_at, total_amount, payment_status, status, notes
+)
+SELECT
+    'DSP-10001', rx.id, p.id,
+    p.first_name || ' ' || p.last_name,
+    d.first_name || ' ' || d.last_name,
+    CURRENT_TIMESTAMP - INTERVAL '18 hours',
+    840.00, 'PAID', 'COMPLETED',
+    'Prescription fulfilled in full with patient counseling provided.'
+FROM prescriptions rx
+JOIN patients p ON rx.patient_id = p.id
+JOIN doctors d ON rx.doctor_id = d.id
+WHERE rx.prescription_number = 'RX-10001'
+ON CONFLICT (dispensation_number) DO NOTHING;
+
+-- Dispensation items
+INSERT INTO pharmacy_dispensation_items (
+    dispensation_id, medicine_id, batch_id, quantity, unit_price, subtotal, dosage_instructions
+)
+SELECT
+    d.id, m.id, b.id, 30, 18.00, 540.00, '1 tablet every morning with or without food'
+FROM pharmacy_dispensations d
+JOIN medicines m ON m.medicine_code = 'MED-10003'
+JOIN medicine_batches b ON b.medicine_id = m.id AND b.batch_number = 'BAT-2026-AML01'
+WHERE d.dispensation_number = 'DSP-10001'
+ON CONFLICT DO NOTHING;
+
+INSERT INTO pharmacy_dispensation_items (
+    dispensation_id, medicine_id, batch_id, quantity, unit_price, subtotal, dosage_instructions
+)
+SELECT
+    d.id, m.id, b.id, 30, 10.00, 300.00, '1 tablet after dinner with a full glass of water'
+FROM pharmacy_dispensations d
+JOIN medicines m ON m.medicine_code = 'MED-10011'
+JOIN medicine_batches b ON b.medicine_id = m.id AND b.batch_number = 'BAT-2026-ASP01'
+WHERE d.dispensation_number = 'DSP-10001'
+ON CONFLICT DO NOTHING;
+
+-- Deduct from stock transaction for sample dispensation
+INSERT INTO pharmacy_stock_transactions (
+    medicine_id, batch_id, transaction_type, quantity, balance_after, reference_number, notes
+)
+SELECT
+    m.id, b.id, 'DISPENSE', -30, b.current_quantity, 'DSP-10001', 'Dispensed against prescription RX-10001'
+FROM medicines m
+JOIN medicine_batches b ON b.medicine_id = m.id AND b.batch_number = 'BAT-2026-AML01'
+WHERE m.medicine_code = 'MED-10003'
+ON CONFLICT DO NOTHING;
+
+
 
 
 
