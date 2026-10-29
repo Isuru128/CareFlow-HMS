@@ -1,6 +1,6 @@
 import { NavLink } from 'react-router-dom'
 import { useAuth } from '../../context/AuthContext'
-import { LayoutDashboard, Users, UserCheck, ShieldAlert, HeartPulse, Stethoscope, CalendarCheck, UserRoundCheck, ClipboardList, FlaskConical } from 'lucide-react'
+import { LayoutDashboard, Users, UserCheck, ShieldAlert, HeartPulse, Stethoscope, CalendarCheck, UserRoundCheck, ClipboardList, FlaskConical, Pill } from 'lucide-react'
 
 export default function Sidebar() {
   const { user, isAdmin } = useAuth()
@@ -66,6 +66,14 @@ export default function Sidebar() {
         >
           <FlaskConical size={18} />
           <span>Laboratory</span>
+        </NavLink>
+
+        <NavLink
+          to="/pharmacy"
+          className={({ isActive }) => `sidebar-link ${isActive ? 'active' : ''}`}
+        >
+          <Pill size={18} />
+          <span>Pharmacy</span>
         </NavLink>
 
         {isAdmin && (

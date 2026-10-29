@@ -5,6 +5,7 @@ import { patientApi } from '../../features/patients/api/patientApi'
 import { doctorApi } from '../../features/doctors/api/doctorApi'
 import { appointmentApi } from '../../features/appointments/api/appointmentApi'
 import { labApi } from '../../features/lab/api/labApi'
+import { pharmacyApi } from '../../features/pharmacy/api/pharmacyApi'
 import {
   Users,
   Shield,
@@ -18,7 +19,9 @@ import {
   CheckCircle2,
   Building2,
   Plus,
-  FlaskConical
+  FlaskConical,
+  Pill,
+  AlertTriangle
 } from 'lucide-react'
 
 export default function DashboardPage() {
@@ -27,12 +30,14 @@ export default function DashboardPage() {
   const [doctorStats, setDoctorStats] = useState(null)
   const [appointmentStats, setAppointmentStats] = useState(null)
   const [labStats, setLabStats] = useState(null)
+  const [pharmacyStats, setPharmacyStats] = useState(null)
 
   useEffect(() => {
     patientApi.getPatientStats().then(setPatientStats).catch(() => {})
     doctorApi.getDoctorStats().then(setDoctorStats).catch(() => {})
     appointmentApi.getAppointmentStats().then(setAppointmentStats).catch(() => {})
     labApi.getSummaryStats().then(setLabStats).catch(() => {})
+    pharmacyApi.getDashboardStats().then(setPharmacyStats).catch(() => {})
   }, [])
 
   return (
@@ -241,6 +246,61 @@ export default function DashboardPage() {
 
           <Link to="/laboratory" className="btn btn-primary" style={{ width: '100%', justifyContent: 'space-between' }}>
             <span>Go to Laboratory</span>
+            <ArrowRight size={16} />
+          </Link>
+        </div>
+
+        {/* Pharmacy Management Card */}
+        <div className="card card-hover" style={{ display: 'flex', flexDirection: 'column', justifyContent: 'space-between', borderTop: '4px solid #0d9488' }}>
+          <div>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
+              <div style={{
+                display: 'inline-flex',
+                padding: '0.75rem',
+                borderRadius: 'var(--radius-md)',
+                backgroundColor: 'rgba(13, 148, 136, 0.12)',
+                color: '#0d9488'
+              }}>
+                <Pill size={28} />
+              </div>
+
+              {pharmacyStats && (
+                <div style={{ textAlign: 'right' }}>
+                  <div style={{ fontSize: '1.6rem', fontWeight: 800, color: '#0d9488' }}>
+                    {pharmacyStats.totalMedicines || 0}
+                  </div>
+                  <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', fontWeight: 600 }}>Formulary Items</div>
+                </div>
+              )}
+            </div>
+
+            <h2 style={{ fontSize: '1.25rem', fontWeight: 700, marginBottom: '0.5rem' }}>Pharmacy & Dispensary</h2>
+            <p style={{ fontSize: '0.85rem', color: 'var(--text-muted)', marginBottom: '1.25rem' }}>
+              Manage medication inventory, process doctor prescriptions with FEFO lot allocation, monitor expirations, and perform OTC sales.
+            </p>
+
+            {pharmacyStats && (
+              <div style={{ display: 'flex', gap: '0.5rem', marginBottom: '1.5rem', flexWrap: 'wrap' }}>
+                <span style={{ fontSize: '0.75rem', background: '#ecfdf5', color: '#047857', padding: '0.25rem 0.6rem', borderRadius: 'var(--radius-sm)', fontWeight: 600 }}>
+                  {pharmacyStats.activeMedicines || 0} Active Formularies
+                </span>
+                {pharmacyStats.lowStockCount > 0 && (
+                  <span style={{ fontSize: '0.75rem', background: '#fef3c7', color: '#b45309', padding: '0.25rem 0.6rem', borderRadius: 'var(--radius-sm)', fontWeight: 700, display: 'flex', alignItems: 'center', gap: '0.25rem' }}>
+                    <AlertTriangle size={12} />
+                    {pharmacyStats.lowStockCount} Low Stock
+                  </span>
+                )}
+                {pharmacyStats.expiredCount > 0 && (
+                  <span style={{ fontSize: '0.75rem', background: '#fee2e2', color: '#b91c1c', padding: '0.25rem 0.6rem', borderRadius: 'var(--radius-sm)', fontWeight: 700 }}>
+                    {pharmacyStats.expiredCount} Expired Lots
+                  </span>
+                )}
+              </div>
+            )}
+          </div>
+
+          <Link to="/pharmacy" className="btn btn-primary" style={{ width: '100%', justifyContent: 'space-between', backgroundColor: '#0d9488', borderColor: '#0d9488' }}>
+            <span>Go to Pharmacy</span>
             <ArrowRight size={16} />
           </Link>
         </div>

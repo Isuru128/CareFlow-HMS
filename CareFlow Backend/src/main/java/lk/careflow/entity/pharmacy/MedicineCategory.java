@@ -1,0 +1,16 @@
+package lk.careflow.entity.pharmacy;
+
+public enum MedicineCategory {
+    ANALGESIC,
+    ANTIBIOTIC,
+    ANTIHYPERTENSIVE,
+    ANTIDIABETIC,
+    ANTIHISTAMINE,
+    ANTIPYRETIC,
+    GASTROINTESTINAL,
+    CARDIOVASCULAR,
+    RESPIRATORY,
+    DERMATOLOGICAL,
+    VITAMINS_SUPPLEMENTS,
+    OTHER
+}
