@@ -1614,3 +1614,329 @@ ON CONFLICT DO NOTHING;
 
 
 
+-- ==============================================================================
+-- Module 3.8 - Billing System (Admissions, Invoices, Charges & Payments)
+-- ==============================================================================
+
+-- ------------------------------------------------------------------------------
+-- 29. ADMISSIONS TABLE (INPATIENT STAYS & WARD/BED CHARGES)
+-- Tracks inpatient admissions, ward/room allocation, daily room & nursing tariffs,
+-- length of stay, and discharge details for admission charge calculation.
+-- ------------------------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS admissions (
+    id BIGSERIAL PRIMARY KEY,
+    admission_number VARCHAR(30) NOT NULL UNIQUE,
+    patient_id BIGINT NOT NULL REFERENCES patients(id) ON DELETE CASCADE,
+    attending_doctor_id BIGINT REFERENCES doctors(id) ON DELETE SET NULL,
+    department_id BIGINT REFERENCES departments(id) ON DELETE SET NULL,
+    ward_name VARCHAR(100) NOT NULL,
+    room_type VARCHAR(50) NOT NULL CHECK (
+        room_type IN (
+            'GENERAL_WARD',
+            'SEMI_PRIVATE',
+            'PRIVATE_ROOM',
+            'DELUXE_SUITE',
+            'ICU',
+            'NICU',
+            'EMERGENCY_OBSERVATION'
+        )
+    ),
+    bed_number VARCHAR(30) NOT NULL,
+    admission_date TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    discharge_date TIMESTAMPTZ,
+    daily_room_rate NUMERIC(10, 2) NOT NULL DEFAULT 0.00,
+    nursing_fee_per_day NUMERIC(10, 2) NOT NULL DEFAULT 0.00,
+    admission_reason TEXT,
+    discharge_notes TEXT,
+    status VARCHAR(30) NOT NULL DEFAULT 'ADMITTED' CHECK (
+        status IN ('ADMITTED', 'DISCHARGED', 'TRANSFERRED', 'CANCELLED')
+    ),
+    admitted_by BIGINT REFERENCES users(id) ON DELETE SET NULL,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+
+-- ------------------------------------------------------------------------------
+-- 30. BILLING INVOICES TABLE (INVOICE GENERATION & FINANCIAL HEADERS)
+-- Central billing invoice header consolidating consultation, laboratory,
+-- pharmacy, and admission charges with tax, discounts, and payment balance.
+-- ------------------------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS billing_invoices (
+    id BIGSERIAL PRIMARY KEY,
+    invoice_number VARCHAR(30) NOT NULL UNIQUE,
+    patient_id BIGINT NOT NULL REFERENCES patients(id) ON DELETE RESTRICT,
+    appointment_id BIGINT REFERENCES appointments(id) ON DELETE SET NULL,
+    admission_id BIGINT REFERENCES admissions(id) ON DELETE SET NULL,
+    issue_date TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    due_date DATE,
+    subtotal NUMERIC(12, 2) NOT NULL DEFAULT 0.00,
+    discount_amount NUMERIC(12, 2) NOT NULL DEFAULT 0.00,
+    tax_amount NUMERIC(12, 2) NOT NULL DEFAULT 0.00,
+    total_amount NUMERIC(12, 2) NOT NULL DEFAULT 0.00,
+    paid_amount NUMERIC(12, 2) NOT NULL DEFAULT 0.00,
+    balance_due NUMERIC(12, 2) NOT NULL DEFAULT 0.00,
+    status VARCHAR(30) NOT NULL DEFAULT 'ISSUED' CHECK (
+        status IN ('DRAFT', 'ISSUED', 'PARTIALLY_PAID', 'PAID', 'OVERDUE', 'CANCELLED', 'REFUNDED')
+    ),
+    notes TEXT,
+    created_by BIGINT REFERENCES users(id) ON DELETE SET NULL,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+
+-- ------------------------------------------------------------------------------
+-- 31. BILLING INVOICE ITEMS TABLE (CONSULTATION, LAB, PHARMACY & ADMISSION CHARGES)
+-- Line items breaking down charges by category with source reference links.
+-- ------------------------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS billing_invoice_items (
+    id BIGSERIAL PRIMARY KEY,
+    invoice_id BIGINT NOT NULL REFERENCES billing_invoices(id) ON DELETE CASCADE,
+    charge_type VARCHAR(30) NOT NULL CHECK (
+        charge_type IN ('CONSULTATION', 'LABORATORY', 'PHARMACY', 'ADMISSION', 'PROCEDURE', 'OTHER')
+    ),
+    reference_type VARCHAR(50),
+    reference_id BIGINT,
+    reference_code VARCHAR(50),
+    description VARCHAR(255) NOT NULL,
+    service_date DATE DEFAULT CURRENT_DATE,
+    quantity INT NOT NULL DEFAULT 1 CHECK (quantity > 0),
+    unit_price NUMERIC(12, 2) NOT NULL DEFAULT 0.00,
+    discount_amount NUMERIC(12, 2) NOT NULL DEFAULT 0.00,
+    subtotal NUMERIC(12, 2) NOT NULL DEFAULT 0.00,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+
+-- ------------------------------------------------------------------------------
+-- 32. BILLING PAYMENTS TABLE (PAYMENT RECORDING & RECEIPTS)
+-- Records full or installment payments against invoices across multiple payment modes.
+-- ------------------------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS billing_payments (
+    id BIGSERIAL PRIMARY KEY,
+    payment_number VARCHAR(30) NOT NULL UNIQUE,
+    invoice_id BIGINT NOT NULL REFERENCES billing_invoices(id) ON DELETE CASCADE,
+    patient_id BIGINT NOT NULL REFERENCES patients(id) ON DELETE RESTRICT,
+    payment_date TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    amount NUMERIC(12, 2) NOT NULL CHECK (amount > 0),
+    payment_method VARCHAR(30) NOT NULL CHECK (
+        payment_method IN ('CASH', 'CARD', 'BANK_TRANSFER', 'INSURANCE', 'ONLINE', 'CHEQUE')
+    ),
+    transaction_reference VARCHAR(100),
+    payer_name VARCHAR(150),
+    insurance_provider VARCHAR(150),
+    insurance_policy_number VARCHAR(100),
+    status VARCHAR(30) NOT NULL DEFAULT 'COMPLETED' CHECK (
+        status IN ('COMPLETED', 'PENDING', 'FAILED', 'REFUNDED')
+    ),
+    received_by BIGINT REFERENCES users(id) ON DELETE SET NULL,
+    notes TEXT,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+
+-- ------------------------------------------------------------------------------
+-- INDEXES FOR BILLING & ADMISSIONS MODULE
+-- ------------------------------------------------------------------------------
+CREATE INDEX IF NOT EXISTS idx_admissions_number ON admissions(admission_number);
+CREATE INDEX IF NOT EXISTS idx_admissions_patient ON admissions(patient_id);
+CREATE INDEX IF NOT EXISTS idx_admissions_doctor ON admissions(attending_doctor_id);
+CREATE INDEX IF NOT EXISTS idx_admissions_status ON admissions(status);
+CREATE INDEX IF NOT EXISTS idx_admissions_date ON admissions(admission_date);
+
+CREATE INDEX IF NOT EXISTS idx_billing_invoices_number ON billing_invoices(invoice_number);
+CREATE INDEX IF NOT EXISTS idx_billing_invoices_patient ON billing_invoices(patient_id);
+CREATE INDEX IF NOT EXISTS idx_billing_invoices_status ON billing_invoices(status);
+CREATE INDEX IF NOT EXISTS idx_billing_invoices_issue_date ON billing_invoices(issue_date);
+CREATE INDEX IF NOT EXISTS idx_billing_invoices_due_date ON billing_invoices(due_date);
+
+CREATE INDEX IF NOT EXISTS idx_billing_items_invoice ON billing_invoice_items(invoice_id);
+CREATE INDEX IF NOT EXISTS idx_billing_items_charge_type ON billing_invoice_items(charge_type);
+CREATE INDEX IF NOT EXISTS idx_billing_items_ref_code ON billing_invoice_items(reference_code);
+
+CREATE INDEX IF NOT EXISTS idx_billing_payments_number ON billing_payments(payment_number);
+CREATE INDEX IF NOT EXISTS idx_billing_payments_invoice ON billing_payments(invoice_id);
+CREATE INDEX IF NOT EXISTS idx_billing_payments_patient ON billing_payments(patient_id);
+CREATE INDEX IF NOT EXISTS idx_billing_payments_method ON billing_payments(payment_method);
+CREATE INDEX IF NOT EXISTS idx_billing_payments_date ON billing_payments(payment_date);
+
+-- ------------------------------------------------------------------------------
+-- TRIGGERS FOR BILLING & ADMISSIONS TIMESTAMPS
+-- ------------------------------------------------------------------------------
+DROP TRIGGER IF EXISTS trg_update_admissions_timestamp ON admissions;
+CREATE TRIGGER trg_update_admissions_timestamp
+BEFORE UPDATE ON admissions
+FOR EACH ROW
+EXECUTE FUNCTION update_timestamp_column();
+
+DROP TRIGGER IF EXISTS trg_update_billing_invoices_timestamp ON billing_invoices;
+CREATE TRIGGER trg_update_billing_invoices_timestamp
+BEFORE UPDATE ON billing_invoices
+FOR EACH ROW
+EXECUTE FUNCTION update_timestamp_column();
+
+DROP TRIGGER IF EXISTS trg_update_billing_payments_timestamp ON billing_payments;
+CREATE TRIGGER trg_update_billing_payments_timestamp
+BEFORE UPDATE ON billing_payments
+FOR EACH ROW
+EXECUTE FUNCTION update_timestamp_column();
+
+-- ------------------------------------------------------------------------------
+-- SEED DATA: ADMISSIONS, INVOICES, ITEMIZED CHARGES & PAYMENTS
+-- ------------------------------------------------------------------------------
+INSERT INTO admissions (
+    admission_number, patient_id, attending_doctor_id, department_id,
+    ward_name, room_type, bed_number, admission_date, discharge_date,
+    daily_room_rate, nursing_fee_per_day, admission_reason, discharge_notes, status
+)
+SELECT
+    'ADM-10001',
+    p.id,
+    d.id,
+    d.department_id,
+    'Cardiology Observation Ward',
+    'SEMI_PRIVATE',
+    'C-104B',
+    CURRENT_TIMESTAMP - INTERVAL '2 days',
+    CURRENT_TIMESTAMP - INTERVAL '4 hours',
+    6500.00,
+    1500.00,
+    '24-hour blood pressure & cardiac telemetry monitoring for Stage 1 Hypertension with exertional chest tightness.',
+    'Hemodynamically stable. Discharged on oral antihypertensive regimen with outpatient follow-up.',
+    'DISCHARGED'
+FROM patients p, doctors d
+WHERE p.patient_number = 'PAT-10001' AND d.doctor_number = 'DOC-10001'
+ON CONFLICT (admission_number) DO NOTHING;
+
+-- Seed Consolidated Invoice for PAT-10001 (Consultation + Lab + Pharmacy + Admission Charges)
+INSERT INTO billing_invoices (
+    invoice_number, patient_id, appointment_id, admission_id,
+    issue_date, due_date, subtotal, discount_amount, tax_amount,
+    total_amount, paid_amount, balance_due, status, notes
+)
+SELECT
+    'INV-10001',
+    p.id,
+    a.id,
+    adm.id,
+    CURRENT_TIMESTAMP - INTERVAL '3 hours',
+    CURRENT_DATE + INTERVAL '7 days',
+    24040.00,
+    1040.00,
+    0.00,
+    23000.00,
+    15000.00,
+    8000.00,
+    'PARTIALLY_PAID',
+    'Consolidated hospital bill covering Cardiology Consultation, Hematology & Lipid Lab Panel, Pharmacy Medications, and 2-Day Cardiac Observation Admission.'
+FROM patients p
+LEFT JOIN appointments a ON a.appointment_number = 'APT-10001'
+LEFT JOIN admissions adm ON adm.admission_number = 'ADM-10001'
+WHERE p.patient_number = 'PAT-10001'
+ON CONFLICT (invoice_number) DO NOTHING;
+
+-- 1. Consultation Charge Item
+INSERT INTO billing_invoice_items (
+    invoice_id, charge_type, reference_type, reference_id, reference_code,
+    description, service_date, quantity, unit_price, discount_amount, subtotal
+)
+SELECT
+    inv.id,
+    'CONSULTATION',
+    'APPOINTMENT',
+    a.id,
+    'APT-10001',
+    'Specialist Cardiology Consultation - Dr. Kumara Perera',
+    CURRENT_DATE,
+    1,
+    3500.00,
+    0.00,
+    3500.00
+FROM billing_invoices inv
+LEFT JOIN appointments a ON a.appointment_number = 'APT-10001'
+WHERE inv.invoice_number = 'INV-10001'
+ON CONFLICT DO NOTHING;
+
+-- 2. Laboratory Charge Items (CBC + Lipid Profile)
+INSERT INTO billing_invoice_items (
+    invoice_id, charge_type, reference_type, reference_id, reference_code,
+    description, service_date, quantity, unit_price, discount_amount, subtotal
+)
+SELECT
+    inv.id,
+    'LABORATORY',
+    'LAB_REQUEST',
+    lr.id,
+    'LRQ-10001',
+    'Laboratory Diagnostics: Complete Blood Count (CBC) & Lipid Profile',
+    CURRENT_DATE - INTERVAL '1 day',
+    1,
+    3700.00,
+    0.00,
+    3700.00
+FROM billing_invoices inv
+LEFT JOIN lab_requests lr ON lr.request_number = 'LRQ-10001'
+WHERE inv.invoice_number = 'INV-10001'
+ON CONFLICT DO NOTHING;
+
+-- 3. Pharmacy Charge Item (Dispensation DSP-10001)
+INSERT INTO billing_invoice_items (
+    invoice_id, charge_type, reference_type, reference_id, reference_code,
+    description, service_date, quantity, unit_price, discount_amount, subtotal
+)
+SELECT
+    inv.id,
+    'PHARMACY',
+    'PHARMACY_DISPENSATION',
+    dsp.id,
+    'DSP-10001',
+    'Pharmacy Medication Dispensation (Amlodipine 5mg x30, Aspirin 75mg x30)',
+    CURRENT_DATE,
+    1,
+    840.00,
+    0.00,
+    840.00
+FROM billing_invoices inv
+LEFT JOIN pharmacy_dispensations dsp ON dsp.dispensation_number = 'DSP-10001'
+WHERE inv.invoice_number = 'INV-10001'
+ON CONFLICT DO NOTHING;
+
+-- 4. Admission Charge Item (2 Days Semi-Private Ward + Nursing Care)
+INSERT INTO billing_invoice_items (
+    invoice_id, charge_type, reference_type, reference_id, reference_code,
+    description, service_date, quantity, unit_price, discount_amount, subtotal
+)
+SELECT
+    inv.id,
+    'ADMISSION',
+    'ADMISSION',
+    adm.id,
+    'ADM-10001',
+    'Inpatient Admission: Cardiology Observation Ward (Bed C-104B) - Room & Nursing (2 Days)',
+    CURRENT_DATE,
+    2,
+    8000.00,
+    0.00,
+    16000.00
+FROM billing_invoices inv
+LEFT JOIN admissions adm ON adm.admission_number = 'ADM-10001'
+WHERE inv.invoice_number = 'INV-10001'
+ON CONFLICT DO NOTHING;
+
+-- Seed Initial Payment Record (PAY-10001)
+INSERT INTO billing_payments (
+    payment_number, invoice_id, patient_id, payment_date, amount,
+    payment_method, transaction_reference, payer_name, status, notes
+)
+SELECT
+    'PAY-10001',
+    inv.id,
+    inv.patient_id,
+    CURRENT_TIMESTAMP - INTERVAL '2 hours',
+    15000.00,
+    'CARD',
+    'TXN-VISA-884920',
+    'John Doe',
+    'COMPLETED',
+    'Initial advance settlement via Visa credit card at discharge desk.'
+FROM billing_invoices inv
+WHERE inv.invoice_number = 'INV-10001'
+ON CONFLICT (payment_number) DO NOTHING;
