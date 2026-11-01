@@ -626,3 +626,19 @@ button {
     display: none !important;
   }
 }
+
+@media print {
+  .printable-billing-sheet, .printable-billing-sheet * {
+    visibility: visible;
+  }
+  .printable-billing-sheet {
+    position: absolute;
+    left: 0;
+    top: 0;
+    width: 100% !important;
+    max-width: 100% !important;
+    border: none !important;
+    padding: 0 !important;
+    box-shadow: none !important;
+  }
+}
