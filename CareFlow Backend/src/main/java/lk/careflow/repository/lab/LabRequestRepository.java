@@ -20,6 +20,8 @@ public interface LabRequestRepository extends JpaRepository<LabRequest, Long> {
 
     boolean existsByRequestNumber(String requestNumber);
 
+    java.util.List<LabRequest> findByPatientIdOrderByRequestedAtDesc(Long patientId);
+
     @Query("SELECT lr FROM LabRequest lr " +
            "JOIN lr.patient p " +
            "LEFT JOIN lr.doctor d " +

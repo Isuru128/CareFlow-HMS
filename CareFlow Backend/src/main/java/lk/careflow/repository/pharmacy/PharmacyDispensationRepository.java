@@ -23,6 +23,8 @@ public interface PharmacyDispensationRepository extends JpaRepository<PharmacyDi
 
     Optional<PharmacyDispensation> findByPrescriptionId(Long prescriptionId);
 
+    java.util.List<PharmacyDispensation> findByPatientIdOrderByDispensedAtDesc(Long patientId);
+
     @Query("SELECT d FROM PharmacyDispensation d WHERE " +
            "(:status IS NULL OR d.status = :status) AND " +
            "(:paymentStatus IS NULL OR d.paymentStatus = :paymentStatus) AND " +
