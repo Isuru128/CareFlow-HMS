@@ -6,22 +6,18 @@ import { doctorApi } from '../../features/doctors/api/doctorApi'
 import { appointmentApi } from '../../features/appointments/api/appointmentApi'
 import { labApi } from '../../features/lab/api/labApi'
 import { pharmacyApi } from '../../features/pharmacy/api/pharmacyApi'
+import { billingApi } from '../../features/billing/api/billingApi'
 import {
   Users,
-  Shield,
   HeartPulse,
   UserCheck,
   Stethoscope,
-  Activity,
   ArrowRight,
   CalendarCheck,
-  Clock,
-  CheckCircle2,
-  Building2,
-  Plus,
   FlaskConical,
   Pill,
-  AlertTriangle
+  AlertTriangle,
+  Receipt
 } from 'lucide-react'
 
 export default function DashboardPage() {
@@ -31,6 +27,7 @@ export default function DashboardPage() {
   const [appointmentStats, setAppointmentStats] = useState(null)
   const [labStats, setLabStats] = useState(null)
   const [pharmacyStats, setPharmacyStats] = useState(null)
+  const [billingStats, setBillingStats] = useState(null)
 
   useEffect(() => {
     patientApi.getPatientStats().then(setPatientStats).catch(() => {})
@@ -38,6 +35,7 @@ export default function DashboardPage() {
     appointmentApi.getAppointmentStats().then(setAppointmentStats).catch(() => {})
     labApi.getSummaryStats().then(setLabStats).catch(() => {})
     pharmacyApi.getDashboardStats().then(setPharmacyStats).catch(() => {})
+    billingApi.getDashboardStats().then(setBillingStats).catch(() => {})
   }, [])
 
   return (
@@ -301,6 +299,58 @@ export default function DashboardPage() {
 
           <Link to="/pharmacy" className="btn btn-primary" style={{ width: '100%', justifyContent: 'space-between', backgroundColor: '#0d9488', borderColor: '#0d9488' }}>
             <span>Go to Pharmacy</span>
+            <ArrowRight size={16} />
+          </Link>
+        </div>
+
+        {/* Billing & Revenue Summary Card */}
+        <div className="card card-hover" style={{ display: 'flex', flexDirection: 'column', justifyContent: 'space-between', borderTop: '4px solid #059669' }}>
+          <div>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
+              <div style={{
+                display: 'inline-flex',
+                padding: '0.75rem',
+                borderRadius: 'var(--radius-md)',
+                backgroundColor: '#ecfdf5',
+                color: '#059669'
+              }}>
+                <Receipt size={28} />
+              </div>
+
+              {billingStats && (
+                <div style={{ textAlign: 'right' }}>
+                  <div style={{ fontSize: '1.35rem', fontWeight: 800, color: '#059669' }}>
+                    LKR {Number(billingStats.totalCollectedAmount || 0).toLocaleString()}
+                  </div>
+                  <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', fontWeight: 600 }}>Collected Revenue</div>
+                </div>
+              )}
+            </div>
+
+            <h2 style={{ fontSize: '1.25rem', fontWeight: 700, marginBottom: '0.5rem' }}>Billing & Payments</h2>
+            <p style={{ fontSize: '0.85rem', color: 'var(--text-muted)', marginBottom: '1.25rem' }}>
+              Generate consolidated hospital invoices for Consultation, Lab, Pharmacy, and Admission charges, record payments, and print receipts.
+            </p>
+
+            {billingStats && (
+              <div style={{ display: 'flex', gap: '0.5rem', marginBottom: '1.5rem', flexWrap: 'wrap' }}>
+                <span style={{ fontSize: '0.75rem', background: '#e0f2fe', color: '#0369a1', padding: '0.25rem 0.6rem', borderRadius: 'var(--radius-sm)', fontWeight: 600 }}>
+                  {billingStats.totalInvoices || 0} Invoices
+                </span>
+                <span style={{ fontSize: '0.75rem', background: '#ecfdf5', color: '#047857', padding: '0.25rem 0.6rem', borderRadius: 'var(--radius-sm)', fontWeight: 600 }}>
+                  {billingStats.paidInvoicesCount || 0} Paid
+                </span>
+                {Number(billingStats.outstandingReceivables) > 0 && (
+                  <span style={{ fontSize: '0.75rem', background: '#fef3c7', color: '#b45309', padding: '0.25rem 0.6rem', borderRadius: 'var(--radius-sm)', fontWeight: 700 }}>
+                    Due: LKR {Number(billingStats.outstandingReceivables).toLocaleString()}
+                  </span>
+                )}
+              </div>
+            )}
+          </div>
+
+          <Link to="/billing" className="btn btn-primary" style={{ width: '100%', justifyContent: 'space-between', backgroundColor: '#059669', borderColor: '#059669' }}>
+            <span>Go to Billing & Invoicing</span>
             <ArrowRight size={16} />
           </Link>
         </div>
