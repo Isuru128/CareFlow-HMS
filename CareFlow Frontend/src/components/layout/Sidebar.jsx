@@ -10,7 +10,8 @@ import {
   ClipboardList,
   FlaskConical,
   Pill,
-  Receipt
+  Receipt,
+  Briefcase
 } from 'lucide-react'
 
 export default function Sidebar() {
@@ -93,6 +94,14 @@ export default function Sidebar() {
         >
           <Receipt size={18} />
           <span>Billing & Payments</span>
+        </NavLink>
+
+        <NavLink
+          to="/staff"
+          className={({ isActive }) => `sidebar-link ${isActive ? 'active' : ''}`}
+        >
+          <Briefcase size={18} />
+          <span>Staff Management</span>
         </NavLink>
 
         {isAdmin && (
