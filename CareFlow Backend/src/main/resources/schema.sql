@@ -1940,3 +1940,357 @@ SELECT
 FROM billing_invoices inv
 WHERE inv.invoice_number = 'INV-10001'
 ON CONFLICT (payment_number) DO NOTHING;
+
+
+-- ==============================================================================
+-- Module 3.9 - Staff Management (Employees, Attendance, Department Assignment & Leave Records)
+-- ==============================================================================
+
+-- ------------------------------------------------------------------------------
+-- 33. STAFF EMPLOYEES TABLE (EMPLOYEE REGISTRATION & PROFILES)
+-- Central human resources registry for nurses, lab technologists, pharmacists,
+-- receptionists, accountants, doctors, and administrative/support personnel.
+-- ------------------------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS staff_employees (
+    id BIGSERIAL PRIMARY KEY,
+    employee_number VARCHAR(30) NOT NULL UNIQUE,
+    user_id BIGINT REFERENCES users(id) ON DELETE SET NULL,
+    first_name VARCHAR(50) NOT NULL,
+    last_name VARCHAR(50) NOT NULL,
+    nic_or_passport VARCHAR(50) NOT NULL UNIQUE,
+    gender VARCHAR(20) NOT NULL CHECK (gender IN ('MALE', 'FEMALE', 'OTHER')),
+    date_of_birth DATE,
+    contact_number VARCHAR(20) NOT NULL,
+    email VARCHAR(100) NOT NULL UNIQUE,
+    address TEXT,
+    emergency_contact_name VARCHAR(100),
+    emergency_contact_number VARCHAR(20),
+    role_category VARCHAR(40) NOT NULL CHECK (
+        role_category IN (
+            'DOCTOR',
+            'NURSE',
+            'RECEPTIONIST',
+            'LABORATORY_STAFF',
+            'PHARMACIST',
+            'ACCOUNTANT',
+            'ADMINISTRATIVE',
+            'SUPPORT_STAFF'
+        )
+    ),
+    designation VARCHAR(100) NOT NULL,
+    department_id BIGINT NOT NULL REFERENCES departments(id) ON DELETE RESTRICT,
+    employment_type VARCHAR(30) NOT NULL DEFAULT 'FULL_TIME' CHECK (
+        employment_type IN ('FULL_TIME', 'PART_TIME', 'CONTRACT', 'VISITING', 'INTERN')
+    ),
+    shift_type VARCHAR(30) NOT NULL DEFAULT 'REGULAR_DAY' CHECK (
+        shift_type IN ('MORNING', 'EVENING', 'NIGHT', 'ROTATIONAL', 'REGULAR_DAY')
+    ),
+    join_date DATE NOT NULL DEFAULT CURRENT_DATE,
+    basic_salary NUMERIC(12, 2) NOT NULL DEFAULT 0.00,
+    qualification VARCHAR(200),
+    status VARCHAR(30) NOT NULL DEFAULT 'ACTIVE' CHECK (
+        status IN ('ACTIVE', 'ON_LEAVE', 'SUSPENDED', 'RESIGNED', 'TERMINATED')
+    ),
+    annual_leave_quota INT NOT NULL DEFAULT 14,
+    casual_leave_quota INT NOT NULL DEFAULT 7,
+    sick_leave_quota INT NOT NULL DEFAULT 7,
+    notes TEXT,
+    registered_by BIGINT REFERENCES users(id) ON DELETE SET NULL,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+
+-- ------------------------------------------------------------------------------
+-- 34. STAFF ATTENDANCE TABLE (DAILY ATTENDANCE & SHIFT CHECK-IN / CHECK-OUT)
+-- Tracks daily attendance status, check-in/out times, worked hours, and overtime.
+-- ------------------------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS staff_attendance (
+    id BIGSERIAL PRIMARY KEY,
+    employee_id BIGINT NOT NULL REFERENCES staff_employees(id) ON DELETE CASCADE,
+    attendance_date DATE NOT NULL DEFAULT CURRENT_DATE,
+    check_in_time TIME,
+    check_out_time TIME,
+    shift_type VARCHAR(30) NOT NULL DEFAULT 'REGULAR_DAY' CHECK (
+        shift_type IN ('MORNING', 'EVENING', 'NIGHT', 'ROTATIONAL', 'REGULAR_DAY')
+    ),
+    status VARCHAR(30) NOT NULL DEFAULT 'PRESENT' CHECK (
+        status IN ('PRESENT', 'LATE', 'HALF_DAY', 'ABSENT', 'ON_LEAVE', 'HOLIDAY')
+    ),
+    working_hours NUMERIC(5, 2) DEFAULT 0.00,
+    overtime_hours NUMERIC(5, 2) DEFAULT 0.00,
+    remarks TEXT,
+    recorded_by BIGINT REFERENCES users(id) ON DELETE SET NULL,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    CONSTRAINT uq_staff_employee_attendance_date UNIQUE (employee_id, attendance_date)
+);
+
+-- ------------------------------------------------------------------------------
+-- 35. STAFF DEPARTMENT ASSIGNMENTS TABLE (DEPARTMENT TRANSFERS & ROLE HISTORY)
+-- Tracks initial department placements, inter-departmental transfers, promotions,
+-- and shift reassignments with effective dates and authorization audit.
+-- ------------------------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS staff_department_assignments (
+    id BIGSERIAL PRIMARY KEY,
+    employee_id BIGINT NOT NULL REFERENCES staff_employees(id) ON DELETE CASCADE,
+    from_department_id BIGINT REFERENCES departments(id) ON DELETE SET NULL,
+    to_department_id BIGINT NOT NULL REFERENCES departments(id) ON DELETE RESTRICT,
+    previous_designation VARCHAR(100),
+    new_designation VARCHAR(100) NOT NULL,
+    previous_shift VARCHAR(30),
+    new_shift VARCHAR(30) NOT NULL,
+    assignment_type VARCHAR(30) NOT NULL DEFAULT 'TRANSFER' CHECK (
+        assignment_type IN ('INITIAL_ASSIGNMENT', 'TRANSFER', 'PROMOTION', 'TEMPORARY_ROTATION', 'REASSIGNMENT')
+    ),
+    effective_date DATE NOT NULL DEFAULT CURRENT_DATE,
+    reason TEXT,
+    assigned_by BIGINT REFERENCES users(id) ON DELETE SET NULL,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+
+-- ------------------------------------------------------------------------------
+-- 36. STAFF LEAVE RECORDS TABLE (LEAVE REQUESTS, APPROVALS & QUOTA TRACKING)
+-- Manages employee leave applications, handover notes, and supervisor approvals.
+-- ------------------------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS staff_leave_records (
+    id BIGSERIAL PRIMARY KEY,
+    leave_number VARCHAR(30) NOT NULL UNIQUE,
+    employee_id BIGINT NOT NULL REFERENCES staff_employees(id) ON DELETE CASCADE,
+    leave_type VARCHAR(30) NOT NULL CHECK (
+        leave_type IN ('ANNUAL', 'CASUAL', 'SICK', 'MATERNITY', 'PATERNITY', 'UNPAID', 'STUDY', 'EMERGENCY')
+    ),
+    start_date DATE NOT NULL,
+    end_date DATE NOT NULL,
+    total_days INT NOT NULL CHECK (total_days > 0),
+    reason TEXT NOT NULL,
+    handover_notes TEXT,
+    emergency_contact VARCHAR(50),
+    status VARCHAR(30) NOT NULL DEFAULT 'PENDING' CHECK (
+        status IN ('PENDING', 'APPROVED', 'REJECTED', 'CANCELLED')
+    ),
+    reviewed_by BIGINT REFERENCES users(id) ON DELETE SET NULL,
+    reviewed_at TIMESTAMPTZ,
+    review_comments TEXT,
+    requested_by BIGINT REFERENCES users(id) ON DELETE SET NULL,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+
+-- ------------------------------------------------------------------------------
+-- INDEXES FOR STAFF MANAGEMENT MODULE
+-- ------------------------------------------------------------------------------
+CREATE INDEX IF NOT EXISTS idx_staff_employees_number ON staff_employees(employee_number);
+CREATE INDEX IF NOT EXISTS idx_staff_employees_dept ON staff_employees(department_id);
+CREATE INDEX IF NOT EXISTS idx_staff_employees_role ON staff_employees(role_category);
+CREATE INDEX IF NOT EXISTS idx_staff_employees_status ON staff_employees(status);
+CREATE INDEX IF NOT EXISTS idx_staff_employees_nic ON staff_employees(nic_or_passport);
+
+CREATE INDEX IF NOT EXISTS idx_staff_attendance_emp ON staff_attendance(employee_id);
+CREATE INDEX IF NOT EXISTS idx_staff_attendance_date ON staff_attendance(attendance_date);
+CREATE INDEX IF NOT EXISTS idx_staff_attendance_status ON staff_attendance(status);
+
+CREATE INDEX IF NOT EXISTS idx_staff_dept_assign_emp ON staff_department_assignments(employee_id);
+CREATE INDEX IF NOT EXISTS idx_staff_dept_assign_to_dept ON staff_department_assignments(to_department_id);
+CREATE INDEX IF NOT EXISTS idx_staff_dept_assign_date ON staff_department_assignments(effective_date);
+
+CREATE INDEX IF NOT EXISTS idx_staff_leave_number ON staff_leave_records(leave_number);
+CREATE INDEX IF NOT EXISTS idx_staff_leave_emp ON staff_leave_records(employee_id);
+CREATE INDEX IF NOT EXISTS idx_staff_leave_status ON staff_leave_records(status);
+CREATE INDEX IF NOT EXISTS idx_staff_leave_dates ON staff_leave_records(start_date, end_date);
+
+-- ------------------------------------------------------------------------------
+-- TRIGGERS FOR STAFF MANAGEMENT TIMESTAMPS
+-- ------------------------------------------------------------------------------
+DROP TRIGGER IF EXISTS trg_update_staff_employees_timestamp ON staff_employees;
+CREATE TRIGGER trg_update_staff_employees_timestamp
+BEFORE UPDATE ON staff_employees
+FOR EACH ROW
+EXECUTE FUNCTION update_timestamp_column();
+
+DROP TRIGGER IF EXISTS trg_update_staff_attendance_timestamp ON staff_attendance;
+CREATE TRIGGER trg_update_staff_attendance_timestamp
+BEFORE UPDATE ON staff_attendance
+FOR EACH ROW
+EXECUTE FUNCTION update_timestamp_column();
+
+DROP TRIGGER IF EXISTS trg_update_staff_leave_records_timestamp ON staff_leave_records;
+CREATE TRIGGER trg_update_staff_leave_records_timestamp
+BEFORE UPDATE ON staff_leave_records
+FOR EACH ROW
+EXECUTE FUNCTION update_timestamp_column();
+
+-- ------------------------------------------------------------------------------
+-- SEED DATA: STAFF EMPLOYEES, ATTENDANCE, DEPARTMENT ASSIGNMENTS & LEAVE RECORDS
+-- ------------------------------------------------------------------------------
+INSERT INTO staff_employees (
+    employee_number, first_name, last_name, nic_or_passport, gender, date_of_birth,
+    contact_number, email, address, emergency_contact_name, emergency_contact_number,
+    role_category, designation, department_id, employment_type, shift_type,
+    join_date, basic_salary, qualification, status, annual_leave_quota, casual_leave_quota, sick_leave_quota, notes
+)
+SELECT
+    'EMP-10001', 'Nadeesha', 'Fernando', '199162409182', 'FEMALE', '1991-04-12',
+    '+94772345671', 'nadeesha.fernando@careflow.lk', '45 Temple Road, Nugegoda, Colombo',
+    'Rohan Fernando', '+94779112233',
+    'NURSE', 'Senior Nursing Sister (CCU)', d.id, 'FULL_TIME', 'MORNING',
+    '2021-03-15', 115000.00, 'BSc in Nursing (Hons), RN - Sri Lanka Nursing Council', 'ACTIVE', 14, 7, 7,
+    'Lead cardiac telemetry and ICU/CCU nursing supervisor.'
+FROM departments d WHERE d.code = 'CARD'
+ON CONFLICT (employee_number) DO NOTHING;
+
+INSERT INTO staff_employees (
+    employee_number, first_name, last_name, nic_or_passport, gender, date_of_birth,
+    contact_number, email, address, emergency_contact_name, emergency_contact_number,
+    role_category, designation, department_id, employment_type, shift_type,
+    join_date, basic_salary, qualification, status, annual_leave_quota, casual_leave_quota, sick_leave_quota, notes
+)
+SELECT
+    'EMP-10002', 'Kasun', 'Wijesinghe', '199318502349', 'MALE', '1993-07-04',
+    '+94713456782', 'kasun.wijesinghe@careflow.lk', '18 Station Lane, Dehiwala',
+    'Malini Wijesinghe', '+94718223344',
+    'LABORATORY_STAFF', 'Senior Medical Laboratory Technologist', d.id, 'FULL_TIME', 'REGULAR_DAY',
+    '2022-01-10', 98000.00, 'BSc in Medical Laboratory Sciences (MLS), SLMC Registered', 'ACTIVE', 14, 7, 7,
+    'In charge of Hematology and Clinical Biochemistry analyzers.'
+FROM departments d WHERE d.code = 'GEN'
+ON CONFLICT (employee_number) DO NOTHING;
+
+INSERT INTO staff_employees (
+    employee_number, first_name, last_name, nic_or_passport, gender, date_of_birth,
+    contact_number, email, address, emergency_contact_name, emergency_contact_number,
+    role_category, designation, department_id, employment_type, shift_type,
+    join_date, basic_salary, qualification, status, annual_leave_quota, casual_leave_quota, sick_leave_quota, notes
+)
+SELECT
+    'EMP-10003', 'Tharushi', 'Senanayake', '199573201845', 'FEMALE', '1995-08-19',
+    '+94764567893', 'tharushi.senanayake@careflow.lk', '102 Kandy Road, Kelaniya',
+    'Sunil Senanayake', '+94775544332',
+    'PHARMACIST', 'Chief Hospital Pharmacist', d.id, 'FULL_TIME', 'REGULAR_DAY',
+    '2022-06-01', 105000.00, 'B.Pharm (Hons), SLMC Registered Pharmacist', 'ACTIVE', 14, 7, 7,
+    'Oversees inpatient/outpatient pharmacy dispensing and FEFO narcotic inventory.'
+FROM departments d WHERE d.code = 'GEN'
+ON CONFLICT (employee_number) DO NOTHING;
+
+INSERT INTO staff_employees (
+    employee_number, first_name, last_name, nic_or_passport, gender, date_of_birth,
+    contact_number, email, address, emergency_contact_name, emergency_contact_number,
+    role_category, designation, department_id, employment_type, shift_type,
+    join_date, basic_salary, qualification, status, annual_leave_quota, casual_leave_quota, sick_leave_quota, notes
+)
+SELECT
+    'EMP-10004', 'Dinesh', 'Rajapaksha', '199724109823', 'MALE', '1997-09-28',
+    '+94775678904', 'dinesh.rajapaksha@careflow.lk', '29 Lake Drive, Rajagiriya',
+    'Chamari Rajapaksha', '+94776655441',
+    'RECEPTIONIST', 'Front Desk & Admissions Executive', d.id, 'FULL_TIME', 'MORNING',
+    '2023-02-01', 68000.00, 'Diploma in Healthcare Administration & Customer Relations', 'ACTIVE', 14, 7, 7,
+    'Handles outpatient appointments, queue coordination, and inpatient admissions desk.'
+FROM departments d WHERE d.code = 'PED'
+ON CONFLICT (employee_number) DO NOTHING;
+
+INSERT INTO staff_employees (
+    employee_number, first_name, last_name, nic_or_passport, gender, date_of_birth,
+    contact_number, email, address, emergency_contact_name, emergency_contact_number,
+    role_category, designation, department_id, employment_type, shift_type,
+    join_date, basic_salary, qualification, status, annual_leave_quota, casual_leave_quota, sick_leave_quota, notes
+)
+SELECT
+    'EMP-10005', 'Dilani', 'Gunaratne', '199051208734', 'FEMALE', '1990-01-11',
+    '+94716789015', 'dilani.gunaratne@careflow.lk', '74 Havelock Road, Colombo 05',
+    'Pradeep Gunaratne', '+94714433221',
+    'ACCOUNTANT', 'Senior Billing & Revenue Accountant', d.id, 'FULL_TIME', 'REGULAR_DAY',
+    '2020-11-15', 125000.00, 'BSc Finance, CIMA Passed Finalist', 'ON_LEAVE', 14, 7, 7,
+    'Manages inpatient discharge billing, insurance claims, and daily cash reconciliation.'
+FROM departments d WHERE d.code = 'ORTHO'
+ON CONFLICT (employee_number) DO NOTHING;
+
+-- Seed Initial Department Assignment History
+INSERT INTO staff_department_assignments (
+    employee_id, from_department_id, to_department_id, previous_designation, new_designation,
+    previous_shift, new_shift, assignment_type, effective_date, reason
+)
+SELECT
+    e.id, NULL, e.department_id, NULL, e.designation,
+    NULL, e.shift_type, 'INITIAL_ASSIGNMENT', e.join_date,
+    'Initial hospital onboarding and clinical department placement.'
+FROM staff_employees e
+WHERE e.employee_number IN ('EMP-10001', 'EMP-10002', 'EMP-10003', 'EMP-10004', 'EMP-10005')
+ON CONFLICT DO NOTHING;
+
+-- Seed Sample Inter-Departmental Promotion/Transfer for EMP-10001
+INSERT INTO staff_department_assignments (
+    employee_id, from_department_id, to_department_id, previous_designation, new_designation,
+    previous_shift, new_shift, assignment_type, effective_date, reason
+)
+SELECT
+    e.id, d_from.id, e.department_id, 'Staff Nurse (General Ward)', 'Senior Nursing Sister (CCU)',
+    'ROTATIONAL', 'MORNING', 'PROMOTION', CURRENT_DATE - INTERVAL '90 days',
+    'Promoted to Senior Nursing Sister and assigned to Cardiology Coronary Care Unit.'
+FROM staff_employees e, departments d_from
+WHERE e.employee_number = 'EMP-10001' AND d_from.code = 'GEN'
+ON CONFLICT DO NOTHING;
+
+-- Seed Today's Attendance Records
+INSERT INTO staff_attendance (
+    employee_id, attendance_date, check_in_time, check_out_time, shift_type, status, working_hours, overtime_hours, remarks
+)
+SELECT
+    e.id, CURRENT_DATE, '07:55:00', '16:15:00', e.shift_type, 'PRESENT', 8.33, 0.33, 'On-time morning ward handover completed'
+FROM staff_employees e WHERE e.employee_number = 'EMP-10001'
+ON CONFLICT (employee_id, attendance_date) DO NOTHING;
+
+INSERT INTO staff_attendance (
+    employee_id, attendance_date, check_in_time, check_out_time, shift_type, status, working_hours, overtime_hours, remarks
+)
+SELECT
+    e.id, CURRENT_DATE, '08:02:00', '17:05:00', e.shift_type, 'PRESENT', 9.05, 1.05, 'Completed STAT hematology batch calibration'
+FROM staff_employees e WHERE e.employee_number = 'EMP-10002'
+ON CONFLICT (employee_id, attendance_date) DO NOTHING;
+
+INSERT INTO staff_attendance (
+    employee_id, attendance_date, check_in_time, check_out_time, shift_type, status, working_hours, overtime_hours, remarks
+)
+SELECT
+    e.id, CURRENT_DATE, '08:35:00', NULL, e.shift_type, 'LATE', 0.00, 0.00, 'Delayed due to traffic congestion; currently on active pharmacy duty'
+FROM staff_employees e WHERE e.employee_number = 'EMP-10003'
+ON CONFLICT (employee_id, attendance_date) DO NOTHING;
+
+INSERT INTO staff_attendance (
+    employee_id, attendance_date, check_in_time, check_out_time, shift_type, status, working_hours, overtime_hours, remarks
+)
+SELECT
+    e.id, CURRENT_DATE, '07:50:00', NULL, e.shift_type, 'PRESENT', 0.00, 0.00, 'Checked in at OPD reception desk'
+FROM staff_employees e WHERE e.employee_number = 'EMP-10004'
+ON CONFLICT (employee_id, attendance_date) DO NOTHING;
+
+INSERT INTO staff_attendance (
+    employee_id, attendance_date, check_in_time, check_out_time, shift_type, status, working_hours, overtime_hours, remarks
+)
+SELECT
+    e.id, CURRENT_DATE, NULL, NULL, e.shift_type, 'ON_LEAVE', 0.00, 0.00, 'Approved annual leave (LVE-10001)'
+FROM staff_employees e WHERE e.employee_number = 'EMP-10005'
+ON CONFLICT (employee_id, attendance_date) DO NOTHING;
+
+-- Seed Sample Leave Records
+INSERT INTO staff_leave_records (
+    leave_number, employee_id, leave_type, start_date, end_date, total_days,
+    reason, handover_notes, emergency_contact, status, reviewed_at, review_comments
+)
+SELECT
+    'LVE-10001', e.id, 'ANNUAL', CURRENT_DATE - INTERVAL '1 day', CURRENT_DATE + INTERVAL '2 days', 4,
+    'Family wedding and personal annual vacation in Kandy.',
+    'Daily billing reconciliation and insurance claim files handed over to Assistant Accountant.',
+    '+94716789015', 'APPROVED', CURRENT_TIMESTAMP - INTERVAL '2 days',
+    'Approved. Handover verified with finance department.'
+FROM staff_employees e WHERE e.employee_number = 'EMP-10005'
+ON CONFLICT (leave_number) DO NOTHING;
+
+INSERT INTO staff_leave_records (
+    leave_number, employee_id, leave_type, start_date, end_date, total_days,
+    reason, handover_notes, emergency_contact, status
+)
+SELECT
+    'LVE-10002', e.id, 'CASUAL', CURRENT_DATE + INTERVAL '5 days', CURRENT_DATE + INTERVAL '6 days', 2,
+    'Attending SLMC Medical Laboratory Continuing Professional Development (CPD) workshop.',
+    'Routine analyzer quality control assigned to junior lab technologist.',
+    '+94713456782', 'PENDING'
+FROM staff_employees e WHERE e.employee_number = 'EMP-10002'
+ON CONFLICT (leave_number) DO NOTHING;
