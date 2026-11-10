@@ -11,7 +11,8 @@ import {
   FlaskConical,
   Pill,
   Receipt,
-  Briefcase
+  Briefcase,
+  FileBarChart
 } from 'lucide-react'
 
 export default function Sidebar() {
@@ -102,6 +103,14 @@ export default function Sidebar() {
         >
           <Briefcase size={18} />
           <span>Staff Management</span>
+        </NavLink>
+
+        <NavLink
+          to="/reports"
+          className={({ isActive }) => `sidebar-link ${isActive ? 'active' : ''}`}
+        >
+          <FileBarChart size={18} />
+          <span>Reports & Analytics</span>
         </NavLink>
 
         {isAdmin && (
