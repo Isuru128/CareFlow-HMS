@@ -1,0 +1,30 @@
+# ==============================================================================
+# Render.com Blueprint Specification for CareFlow HMS Backend
+# ==============================================================================
+services:
+  - type: web
+    name: careflow-hms-backend
+    runtime: docker
+    rootDir: CareFlow Backend
+    dockerfilePath: ./Dockerfile
+    healthCheckPath: /api/public/health
+    envVars:
+      - key: PORT
+        value: 8080
+      - key: TZ
+        value: Asia/Colombo
+      - key: UPLOAD_DIR
+        value: /app/uploads/patient-documents
+      - key: JWT_EXPIRATION_MS
+        value: 86400000
+      - key: JWT_REFRESH_EXPIRATION_MS
+        value: 604800000
+      - key: DB_URL
+        sync: false
+      - key: DB_USERNAME
+        sync: false
+      - key: DB_PASSWORD
+        sync: false
+      - key: JWT_SECRET
+        generateValue: true
+
