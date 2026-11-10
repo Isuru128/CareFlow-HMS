@@ -1,10 +1,27 @@
+# Maven build output
 target/
+!target/.gitkeep
+
+# Version control & IDEs
 .git/
 .gitignore
 .idea/
 .vscode/
 *.iml
+*.iws
+*.ipr
+
+# Local logs & runtime uploads
 *.log
+logs/
+uploads/
+tmp/
+
+# Local environment secrets (Render injects env vars via dashboard)
 .env
 .env.*
 !.env.example
+
+# OS metadata
+.DS_Store
+Thumbs.db
