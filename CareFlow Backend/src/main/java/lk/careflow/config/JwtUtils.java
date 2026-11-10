@@ -11,6 +11,8 @@ import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.stereotype.Component;
 
 import javax.crypto.SecretKey;
+import java.nio.charset.StandardCharsets;
+import java.security.MessageDigest;
 import java.util.Date;
 
 @Component
@@ -20,11 +22,25 @@ public class JwtUtils {
     @Value("${careflow.app.jwtSecret}")
     private String jwtSecret;
 
-    @Value("${careflow.app.jwtExpirationMs}")
+    @Value("${careflow.app.jwtExpirationMs:86400000}")
     private int jwtExpirationMs;
 
     private SecretKey key() {
-        return Keys.hmacShaKeyFor(Decoders.BASE64.decode(jwtSecret));
+        try {
+            byte[] decoded = Decoders.BASE64.decode(jwtSecret);
+            if (decoded.length >= 32) {
+                return Keys.hmacShaKeyFor(decoded);
+            }
+        } catch (Exception ignored) {
+            // Fallback to SHA-256 digest of raw secret string (e.g. Render auto-generated secrets)
+        }
+        try {
+            MessageDigest digest = MessageDigest.getInstance("SHA-256");
+            byte[] hash = digest.digest(jwtSecret.getBytes(StandardCharsets.UTF_8));
+            return Keys.hmacShaKeyFor(hash);
+        } catch (Exception e) {
+            throw new IllegalStateException("Failed to initialize JWT signing key", e);
+        }
     }
 
     public String generateJwtToken(Authentication authentication) {
