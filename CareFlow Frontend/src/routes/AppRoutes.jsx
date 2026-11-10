@@ -14,6 +14,7 @@ import LabDashboardPage from '../pages/lab/LabDashboardPage'
 import PharmacyDashboardPage from '../pages/pharmacy/PharmacyDashboardPage'
 import BillingDashboardPage from '../pages/billing/BillingDashboardPage'
 import StaffDashboardPage from '../pages/staff/StaffDashboardPage'
+import ReportsDashboardPage from '../pages/reports/ReportsDashboardPage'
 import ProtectedRoute from './ProtectedRoute'
 import MainLayout from '../components/layout/MainLayout'
 
@@ -39,6 +40,7 @@ export default function AppRoutes() {
           <Route path="/pharmacy" element={<PharmacyDashboardPage />} />
           <Route path="/billing" element={<BillingDashboardPage />} />
           <Route path="/staff" element={<StaffDashboardPage />} />
+          <Route path="/reports" element={<ReportsDashboardPage />} />
 
           {/* Admin Protected Routes */}
           <Route element={<ProtectedRoute requiredRole="ROLE_ADMIN" />}>
