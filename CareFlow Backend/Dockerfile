@@ -1,50 +1,78 @@
 # ==============================================================================
-# CareFlow Hospital Management System (HMS) - Backend Dockerfile
-# Optimized for Render.com deployment with Multi-stage Build & Eclipse Temurin 21
+# CareFlow Hospital Management System (HMS) - Complete Production Dockerfile
+# Target Platform : Render.com Web Service (Docker Runtime)
+# Stack           : Java 21 (Eclipse Temurin) + Spring Boot 4.1.1 + PostgreSQL
+# Modules         : Auth, Patient, Doctor, Appointment, EMR, Lab, Pharmacy,
+#                   Billing (3.8), Staff Management (3.9), Reports (3.10)
 # ==============================================================================
 
 # ------------------------------------------------------------------------------
-# Stage 1: Build the application using Maven Wrapper
+# Stage 1: Maven Build Stage (JDK 21 Alpine)
 # ------------------------------------------------------------------------------
 FROM eclipse-temurin:21-jdk-alpine AS builder
 
 WORKDIR /build
 
-# Copy Maven wrapper files and pom.xml
+# Copy Maven Wrapper and POM first to maximize Docker layer caching
 COPY .mvn/ .mvn/
 COPY mvnw pom.xml ./
 
-# Normalize line endings (prevents Windows CRLF errors) and ensure executable rights
-RUN sed -i 's/\r$//' mvnw && chmod +x mvnw
+# Normalize Windows CRLF line endings to Unix LF and grant execution permissions
+RUN sed -i 's/\r$//' mvnw .mvn/wrapper/maven-wrapper.properties && \
+    chmod +x mvnw
 
-# Pre-fetch project dependencies to leverage Docker layer caching
+# Download dependencies in offline cache layer
 RUN ./mvnw dependency:go-offline -B
 
-# Copy project source code
+# Copy application source code and SQL schema resources (schema.sql, application.properties)
 COPY src/ ./src/
 
-# Compile and package Spring Boot executable jar
-RUN ./mvnw clean package -DskipTests
+# Package executable Spring Boot fat JAR (skip unit tests during container build)
+RUN ./mvnw clean package -DskipTests -B && \
+    cp /build/target/CareFlow-*.jar /build/target/app.jar
 
 # ------------------------------------------------------------------------------
-# Stage 2: Create lightweight production runtime image
+# Stage 2: Lightweight Production Runtime Stage (JRE 21 Alpine)
 # ------------------------------------------------------------------------------
-FROM eclipse-temurin:21-jre-alpine
+FROM eclipse-temurin:21-jre-alpine AS runtime
 
+LABEL maintainer="CareFlow HMS Engineering"
+LABEL description="CareFlow Hospital Management System - Spring Boot REST API"
+LABEL version="1.0.0"
+
+# Install curl (for Render/Docker healthchecks) and tzdata (for Sri Lanka Standard Time)
+RUN apk add --no-cache curl tzdata
+
+# Set working directory
 WORKDIR /app
 
-# Create a non-root user and group for security
-RUN addgroup -S appgroup && adduser -S appuser -G appgroup
+# Create a dedicated non-root system user and group for container security
+RUN addgroup -S -g 1001 appgroup && \
+    adduser -S -u 1001 -G appgroup appuser
 
-# Copy the built jar from the builder stage
-COPY --from=builder --chown=appuser:appgroup /build/target/*.jar app.jar
+# Pre-create writable directories required by FileStorageService (@PostConstruct)
+# and multipart uploads so non-root 'appuser' never hits AccessDeniedException on Render
+RUN mkdir -p /app/uploads/patient-documents /tmp/careflow && \
+    chown -R appuser:appgroup /app /tmp/careflow
+
+# Copy compiled executable JAR from builder stage with non-root ownership
+COPY --from=builder --chown=appuser:appgroup /build/target/app.jar /app/app.jar
 
 # Switch to non-root user
 USER appuser
 
-# Render automatically sets the PORT environment variable (default 8080)
-ENV PORT=8080
+# Environment defaults (Render automatically injects PORT, DB_URL, DB_USERNAME, DB_PASSWORD, JWT_SECRET)
+ENV TZ=Asia/Colombo \
+    PORT=8080 \
+    UPLOAD_DIR=/app/uploads/patient-documents \
+    JAVA_OPTS="-XX:+UseContainerSupport -XX:MaxRAMPercentage=75.0 -XX:InitialRAMPercentage=50.0 -XX:+UseG1GC -XX:+ExitOnOutOfMemoryError -Djava.security.egd=file:/dev/./urandom -Dfile.encoding=UTF-8"
+
+# Expose application port (Render dynamically maps PORT at runtime)
 EXPOSE ${PORT}
 
-# Configure JVM options for container memory limits
-ENTRYPOINT ["java", "-XX:+UseContainerSupport", "-XX:MaxRAMPercentage=75.0", "-Djava.security.egd=file:/dev/./urandom", "-jar", "app.jar"]
+# Container healthcheck hitting the public health endpoint
+HEALTHCHECK --interval=30s --timeout=5s --start-period=60s --retries=3 \
+    CMD curl -fsS http://127.0.0.1:${PORT:-8080}/api/public/health || exit 1
+
+# Launch Spring Boot binding dynamically to Render's $PORT environment variable
+ENTRYPOINT ["sh", "-c", "exec java $JAVA_OPTS -Djava.io.tmpdir=/tmp/careflow -Dserver.port=${PORT:-8080} -jar /app/app.jar"]
