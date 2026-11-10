@@ -1,11 +1,36 @@
 -- ==============================================================================
 -- CareFlow Hospital Management System (HMS)
--- Database Schema: Module 3.1 - User Management & RBAC
+-- Complete Database Schema (DDL: Tables, Constraints, Indexes & Triggers)
 -- Target Database: PostgreSQL (Supabase Compatible)
+-- Modules Covered: 3.1 User Management & RBAC
+--                  3.2 Patient Management
+--                  3.3 Doctor Management
+--                  3.4 Appointment Management
+--                  3.5 Electronic Medical Records (EMR)
+--                  3.6 Laboratory Management
+--                  3.7 Pharmacy Management
+--                  3.8 Billing System & Admissions
+--                  3.9 Staff Management
+--                  3.10 Hospital Reports & Analytics
 -- ==============================================================================
 
 -- Enable UUID extension if required for future modules
 CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
+
+-- ------------------------------------------------------------------------------
+-- AUTOMATIC TIMESTAMP UPDATE TRIGGER FUNCTION
+-- ------------------------------------------------------------------------------
+CREATE OR REPLACE FUNCTION update_timestamp_column()
+RETURNS TRIGGER AS $$
+BEGIN
+    NEW.updated_at = CURRENT_TIMESTAMP;
+    RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+-- ==============================================================================
+-- Module 3.1 - User Management & RBAC
+-- ==============================================================================
 
 -- ------------------------------------------------------------------------------
 -- 1. USERS TABLE
@@ -93,7 +118,7 @@ CREATE TABLE IF NOT EXISTS audit_logs (
 );
 
 -- ------------------------------------------------------------------------------
--- INDEXES FOR QUERY OPTIMIZATION
+-- INDEXES & TRIGGERS FOR MODULE 3.1 (USER MANAGEMENT)
 -- ------------------------------------------------------------------------------
 CREATE INDEX IF NOT EXISTS idx_users_username ON users(username);
 CREATE INDEX IF NOT EXISTS idx_users_email ON users(email);
@@ -112,43 +137,12 @@ CREATE INDEX IF NOT EXISTS idx_audit_logs_user_id ON audit_logs(user_id);
 CREATE INDEX IF NOT EXISTS idx_audit_logs_action ON audit_logs(action);
 CREATE INDEX IF NOT EXISTS idx_audit_logs_created_at ON audit_logs(created_at);
 
--- ------------------------------------------------------------------------------
--- AUTOMATIC TIMESTAMP UPDATE TRIGGER
--- ------------------------------------------------------------------------------
-CREATE OR REPLACE FUNCTION update_timestamp_column()
-RETURNS TRIGGER AS $$
-BEGIN
-    NEW.updated_at = CURRENT_TIMESTAMP;
-    RETURN NEW;
-END;
-$$ LANGUAGE plpgsql;
-
 DROP TRIGGER IF EXISTS trg_update_users_timestamp ON users;
 CREATE TRIGGER trg_update_users_timestamp
 BEFORE UPDATE ON users
 FOR EACH ROW
 EXECUTE FUNCTION update_timestamp_column();
 
--- ------------------------------------------------------------------------------
--- SEED DATA: Default Administrator (Credentials: admin / Admin@123)
--- ------------------------------------------------------------------------------
-INSERT INTO users (username, email, password_hash, first_name, last_name, phone_number, status)
-VALUES (
-    'admin',
-    'admin@careflow.lk',
-    '$2a$10$LE7k63jl5YklWQ7Xfw7X6.zxPImenU.SrTO.YfYcw7SRy.3lmh.We',
-    'System',
-    'Administrator',
-    '+94770000000',
-    'ACTIVE'
-)
-ON CONFLICT (username) DO NOTHING;
-
-INSERT INTO user_roles (user_id, role)
-SELECT u.id, 'ROLE_ADMIN'
-FROM users u
-WHERE u.username = 'admin'
-ON CONFLICT (user_id, role) DO NOTHING;
 
 -- ==============================================================================
 -- Module 3.2 - Patient Management
@@ -220,7 +214,7 @@ CREATE TABLE IF NOT EXISTS patient_documents (
 );
 
 -- ------------------------------------------------------------------------------
--- INDEXES FOR PATIENT MANAGEMENT
+-- INDEXES & TRIGGERS FOR MODULE 3.2 (PATIENT MANAGEMENT)
 -- ------------------------------------------------------------------------------
 CREATE INDEX IF NOT EXISTS idx_patients_patient_number ON patients(patient_number);
 CREATE INDEX IF NOT EXISTS idx_patients_first_name ON patients(first_name);
@@ -233,9 +227,6 @@ CREATE INDEX IF NOT EXISTS idx_patients_created_at ON patients(created_at);
 CREATE INDEX IF NOT EXISTS idx_patient_medical_history_patient_id ON patient_medical_history(patient_id);
 CREATE INDEX IF NOT EXISTS idx_patient_documents_patient_id ON patient_documents(patient_id);
 
--- ------------------------------------------------------------------------------
--- TRIGGERS FOR PATIENTS & MEDICAL HISTORY TIMESTAMP UPDATE
--- ------------------------------------------------------------------------------
 DROP TRIGGER IF EXISTS trg_update_patients_timestamp ON patients;
 CREATE TRIGGER trg_update_patients_timestamp
 BEFORE UPDATE ON patients
@@ -248,28 +239,6 @@ BEFORE UPDATE ON patient_medical_history
 FOR EACH ROW
 EXECUTE FUNCTION update_timestamp_column();
 
--- ------------------------------------------------------------------------------
--- SEED DATA: Sample Patient
--- ------------------------------------------------------------------------------
-INSERT INTO patients (patient_number, first_name, last_name, date_of_birth, gender, blood_group, contact_number, email, nic_or_passport, address, emergency_contact_name, emergency_contact_number, emergency_contact_relation, allergies, status)
-VALUES (
-    'PAT-10001',
-    'John',
-    'Doe',
-    '1985-05-15',
-    'MALE',
-    'O+',
-    '+94711234567',
-    'johndoe@example.com',
-    '198512345678',
-    '123 Galle Road, Colombo 03, Sri Lanka',
-    'Jane Doe',
-    '+94719876543',
-    'Spouse',
-    'Penicillin',
-    'ACTIVE'
-)
-ON CONFLICT (patient_number) DO NOTHING;
 
 -- ==============================================================================
 -- Module 3.3 - Doctor Management
@@ -337,6 +306,7 @@ CREATE TABLE IF NOT EXISTS doctor_schedules (
     CONSTRAINT uq_doctor_schedule_day_time UNIQUE (doctor_id, day_of_week, start_time)
 );
 
+
 -- ==============================================================================
 -- Module 3.4 - Appointment Management
 -- ==============================================================================
@@ -372,7 +342,7 @@ CREATE TABLE IF NOT EXISTS appointments (
 );
 
 -- ------------------------------------------------------------------------------
--- INDEXES FOR DOCTOR & APPOINTMENT MANAGEMENT
+-- INDEXES & TRIGGERS FOR MODULES 3.3 & 3.4 (DOCTORS & APPOINTMENTS)
 -- ------------------------------------------------------------------------------
 CREATE INDEX IF NOT EXISTS idx_departments_name ON departments(name);
 CREATE INDEX IF NOT EXISTS idx_departments_code ON departments(code);
@@ -396,9 +366,6 @@ CREATE INDEX IF NOT EXISTS idx_appointments_date ON appointments(appointment_dat
 CREATE INDEX IF NOT EXISTS idx_appointments_status ON appointments(status);
 CREATE INDEX IF NOT EXISTS idx_appointments_doctor_date ON appointments(doctor_id, appointment_date);
 
--- ------------------------------------------------------------------------------
--- TRIGGERS FOR DOCTOR & APPOINTMENT TIMESTAMPS
--- ------------------------------------------------------------------------------
 DROP TRIGGER IF EXISTS trg_update_departments_timestamp ON departments;
 CREATE TRIGGER trg_update_departments_timestamp
 BEFORE UPDATE ON departments
@@ -423,110 +390,6 @@ BEFORE UPDATE ON appointments
 FOR EACH ROW
 EXECUTE FUNCTION update_timestamp_column();
 
--- ------------------------------------------------------------------------------
--- SEED DATA: Departments, Doctors, Schedules & Sample Appointments
--- ------------------------------------------------------------------------------
-INSERT INTO departments (name, code, description, contact_number, is_active)
-VALUES
-    ('Cardiology', 'CARD', 'Comprehensive cardiovascular medicine and care', '+94112345001', TRUE),
-    ('Pediatrics', 'PED', 'Child health and infant medical treatment', '+94112345002', TRUE),
-    ('General Medicine', 'GEN', 'General healthcare, diagnoses, and inpatient care', '+94112345003', TRUE),
-    ('Orthopedics', 'ORTHO', 'Musculoskeletal system, spine, joints, and fractures', '+94112345004', TRUE),
-    ('Neurology', 'NEUR', 'Brain, spinal cord, and nervous system disorders', '+94112345005', TRUE)
-ON CONFLICT (code) DO NOTHING;
-
-INSERT INTO doctors (doctor_number, first_name, last_name, specialization, license_number, department_id, qualification, experience_years, contact_number, email, consultation_fee, room_number, bio, status)
-SELECT
-    'DOC-10001',
-    'Kumara',
-    'Perera',
-    'Cardiologist',
-    'SLMC-12345',
-    d.id,
-    'MBBS, MD (Cardiology), FRCP',
-    15,
-    '+94771234567',
-    'kumara.perera@careflow.lk',
-    3500.00,
-    'Room 102',
-    'Senior Consultant Cardiologist specializing in preventive and interventional cardiology.',
-    'ACTIVE'
-FROM departments d
-WHERE d.code = 'CARD'
-ON CONFLICT (doctor_number) DO NOTHING;
-
-INSERT INTO doctors (doctor_number, first_name, last_name, specialization, license_number, department_id, qualification, experience_years, contact_number, email, consultation_fee, room_number, bio, status)
-SELECT
-    'DOC-10002',
-    'Anoma',
-    'Senanayake',
-    'Pediatrician',
-    'SLMC-23456',
-    d.id,
-    'MBBS, DCH, MD (Pediatrics)',
-    12,
-    '+94772345678',
-    'anoma.senanayake@careflow.lk',
-    2800.00,
-    'Room 205',
-    'Consultant Pediatrician with over a decade of clinical care experience in child wellness.',
-    'ACTIVE'
-FROM departments d
-WHERE d.code = 'PED'
-ON CONFLICT (doctor_number) DO NOTHING;
-
-INSERT INTO doctors (doctor_number, first_name, last_name, specialization, license_number, department_id, qualification, experience_years, contact_number, email, consultation_fee, room_number, bio, status)
-SELECT
-    'DOC-10003',
-    'Rohan',
-    'Wickramasinghe',
-    'General Physician',
-    'SLMC-34567',
-    d.id,
-    'MBBS, MD (General Medicine)',
-    18,
-    '+94773456789',
-    'rohan.wick@careflow.lk',
-    2500.00,
-    'Room 108',
-    'Senior General Physician experienced in chronic illness management and adult medicine.',
-    'ACTIVE'
-FROM departments d
-WHERE d.code = 'GEN'
-ON CONFLICT (doctor_number) DO NOTHING;
-
-INSERT INTO doctor_schedules (doctor_id, day_of_week, start_time, end_time, max_patients, slot_duration_minutes, room_number, is_active)
-SELECT doc.id, 'MONDAY', '09:00:00', '12:00:00', 15, 15, 'Room 102', TRUE
-FROM doctors doc WHERE doc.doctor_number = 'DOC-10001'
-ON CONFLICT DO NOTHING;
-
-INSERT INTO doctor_schedules (doctor_id, day_of_week, start_time, end_time, max_patients, slot_duration_minutes, room_number, is_active)
-SELECT doc.id, 'WEDNESDAY', '09:00:00', '12:00:00', 15, 15, 'Room 102', TRUE
-FROM doctors doc WHERE doc.doctor_number = 'DOC-10001'
-ON CONFLICT DO NOTHING;
-
-INSERT INTO doctor_schedules (doctor_id, day_of_week, start_time, end_time, max_patients, slot_duration_minutes, room_number, is_active)
-SELECT doc.id, 'TUESDAY', '14:00:00', '17:00:00', 20, 15, 'Room 205', TRUE
-FROM doctors doc WHERE doc.doctor_number = 'DOC-10002'
-ON CONFLICT DO NOTHING;
-
-INSERT INTO appointments (appointment_number, patient_id, doctor_id, department_id, appointment_date, appointment_time, queue_number, appointment_type, status, reason, notes, consultation_fee)
-SELECT
-    'APT-10001',
-    p.id,
-    d.id,
-    d.department_id,
-    CURRENT_DATE + INTERVAL '1 day',
-    '09:30:00',
-    1,
-    'CONSULTATION',
-    'SCHEDULED',
-    'Routine cardiology follow-up and blood pressure assessment',
-    'Initial follow-up requested by patient',
-    d.consultation_fee
-FROM patients p, doctors d
-WHERE p.patient_number = 'PAT-10001' AND d.doctor_number = 'DOC-10001'
-ON CONFLICT (appointment_number) DO NOTHING;
 
 -- ==============================================================================
 -- Module 3.5 - Electronic Medical Records (EMR)
@@ -679,7 +542,7 @@ CREATE TABLE IF NOT EXISTS medical_reports (
 );
 
 -- ------------------------------------------------------------------------------
--- INDEXES FOR ELECTRONIC MEDICAL RECORDS (EMR)
+-- INDEXES & TRIGGERS FOR MODULE 3.5 (ELECTRONIC MEDICAL RECORDS)
 -- ------------------------------------------------------------------------------
 CREATE INDEX IF NOT EXISTS idx_medical_records_record_number ON medical_records(record_number);
 CREATE INDEX IF NOT EXISTS idx_medical_records_patient_id ON medical_records(patient_id);
@@ -711,9 +574,6 @@ CREATE INDEX IF NOT EXISTS idx_medical_reports_patient_id ON medical_reports(pat
 CREATE INDEX IF NOT EXISTS idx_medical_reports_doctor_id ON medical_reports(doctor_id);
 CREATE INDEX IF NOT EXISTS idx_medical_reports_report_type ON medical_reports(report_type);
 
--- ------------------------------------------------------------------------------
--- TRIGGERS FOR EMR TIMESTAMPS
--- ------------------------------------------------------------------------------
 DROP TRIGGER IF EXISTS trg_update_medical_records_timestamp ON medical_records;
 CREATE TRIGGER trg_update_medical_records_timestamp
 BEFORE UPDATE ON medical_records
@@ -744,150 +604,13 @@ BEFORE UPDATE ON medical_reports
 FOR EACH ROW
 EXECUTE FUNCTION update_timestamp_column();
 
--- ------------------------------------------------------------------------------
--- SEED DATA: Medical Records, Diagnoses, Prescriptions, Treatments & Reports
--- ------------------------------------------------------------------------------
-INSERT INTO medical_records (
-    record_number, patient_id, doctor_id, appointment_id, visit_date,
-    chief_complaint, examination_notes, clinical_notes,
-    blood_pressure, temperature_celsius, heart_rate_bpm, respiratory_rate_bpm, weight_kg, height_cm, bmi, oxygen_saturation, status
-)
-SELECT
-    'EMR-10001',
-    p.id,
-    d.id,
-    a.id,
-    CURRENT_TIMESTAMP,
-    'Mild chest tightness on exertion and occasional dizziness over past 2 weeks.',
-    'S1 S2 normal, no murmurs. Lungs clear to auscultation bilaterally. No pedal edema.',
-    'Stage 1 Hypertension confirmed with mild exertion angina symptoms. ECG recommended.',
-    '138/88',
-    36.7,
-    76,
-    16,
-    78.00,
-    175.00,
-    25.5,
-    98,
-    'FINALIZED'
-FROM patients p, doctors d
-LEFT JOIN appointments a ON a.appointment_number = 'APT-10001'
-WHERE p.patient_number = 'PAT-10001' AND d.doctor_number = 'DOC-10001'
-ON CONFLICT (record_number) DO NOTHING;
-
-INSERT INTO patient_diagnoses (
-    medical_record_id, patient_id, doctor_id, icd10_code, diagnosis_name, diagnosis_type, status, severity, diagnosed_date, notes
-)
-SELECT
-    mr.id,
-    mr.patient_id,
-    mr.doctor_id,
-    'I10',
-    'Essential (primary) hypertension',
-    'PRIMARY',
-    'ACTIVE',
-    'MODERATE',
-    CURRENT_DATE,
-    'Patient instructed on dietary sodium restriction and daily blood pressure monitoring.'
-FROM medical_records mr
-WHERE mr.record_number = 'EMR-10001'
-ON CONFLICT DO NOTHING;
-
-INSERT INTO prescriptions (
-    prescription_number, medical_record_id, patient_id, doctor_id, issue_date, valid_until, status, instructions, notes
-)
-SELECT
-    'RX-10001',
-    mr.id,
-    mr.patient_id,
-    mr.doctor_id,
-    CURRENT_DATE,
-    CURRENT_DATE + INTERVAL '30 days',
-    'ACTIVE',
-    'Take medications regularly as directed. Return for follow-up in 4 weeks.',
-    'Monitor blood pressure each morning.'
-FROM medical_records mr
-WHERE mr.record_number = 'EMR-10001'
-ON CONFLICT (prescription_number) DO NOTHING;
-
-INSERT INTO prescription_items (
-    prescription_id, medication_name, dosage, frequency, route, duration, quantity, instructions, is_dispensed
-)
-SELECT
-    rx.id,
-    'Amlodipine 5mg Tablet',
-    '5 mg',
-    'Once Daily (Morning)',
-    'ORAL',
-    '30 Days',
-    30,
-    'Take 1 tablet every morning with or without food',
-    FALSE
-FROM prescriptions rx
-WHERE rx.prescription_number = 'RX-10001'
-ON CONFLICT DO NOTHING;
-
-INSERT INTO prescription_items (
-    prescription_id, medication_name, dosage, frequency, route, duration, quantity, instructions, is_dispensed
-)
-SELECT
-    rx.id,
-    'Aspirin 75mg Tablet',
-    '75 mg',
-    'Once Daily (Night)',
-    'ORAL',
-    '30 Days',
-    30,
-    'Take 1 tablet after dinner with a full glass of water',
-    FALSE
-FROM prescriptions rx
-WHERE rx.prescription_number = 'RX-10001'
-ON CONFLICT DO NOTHING;
-
-INSERT INTO treatment_histories (
-    patient_id, medical_record_id, doctor_id, treatment_name, category, start_date, end_date, status, outcome, procedure_notes, complications
-)
-SELECT
-    p.id,
-    mr.id,
-    d.id,
-    'Antihypertensive Pharmacotherapy & Lifestyle Counseling',
-    'MEDICATION_THERAPY',
-    CURRENT_DATE,
-    NULL,
-    'IN_PROGRESS',
-    'IMPROVED',
-    'Initiated calcium channel blocker therapy (Amlodipine 5mg). Prescribed DASH diet and 30 min daily walking.',
-    'None reported'
-FROM patients p, doctors d, medical_records mr
-WHERE p.patient_number = 'PAT-10001' AND d.doctor_number = 'DOC-10001' AND mr.record_number = 'EMR-10001'
-ON CONFLICT DO NOTHING;
-
-INSERT INTO medical_reports (
-    report_number, medical_record_id, patient_id, doctor_id, report_title, report_type, report_date, clinical_findings, recommendations, summary, status
-)
-SELECT
-    'REP-10001',
-    mr.id,
-    p.id,
-    d.id,
-    'Cardiovascular Clinical Consultation Report',
-    'CONSULTATION_NOTE',
-    CURRENT_DATE,
-    'Patient presented with mild chest tightness and elevated blood pressure (138/88 mmHg). Cardiovascular examination revealed normal heart sounds S1 S2, no murmurs. ECG demonstrated normal sinus rhythm without ischemic changes.',
-    '1. Amlodipine 5mg once daily\n2. Low sodium diet\n3. Repeat ECG and lipid profile in 1 month\n4. Follow-up clinic review in 4 weeks',
-    'Essential hypertension well-tolerated on initial presentation. Commenced pharmacotherapy with positive prognosis.',
-    'FINALIZED'
-FROM patients p, doctors d, medical_records mr
-WHERE p.patient_number = 'PAT-10001' AND d.doctor_number = 'DOC-10001' AND mr.record_number = 'EMR-10001'
-ON CONFLICT (report_number) DO NOTHING;
 
 -- ==============================================================================
 -- Module 3.6 - Laboratory Management
 -- ==============================================================================
 
 -- ------------------------------------------------------------------------------
--- 18. LAB TESTS CATALOG TABLE
+-- 19. LAB TESTS CATALOG TABLE
 -- Standard diagnostic tests offered by hospital laboratory with pricing and turnaround times.
 -- ------------------------------------------------------------------------------
 CREATE TABLE IF NOT EXISTS lab_tests (
@@ -911,7 +634,7 @@ CREATE TABLE IF NOT EXISTS lab_tests (
 );
 
 -- ------------------------------------------------------------------------------
--- 19. LAB REQUESTS TABLE
+-- 20. LAB REQUESTS TABLE
 -- Diagnostic test requests ordered by physicians for inpatients or outpatients.
 -- ------------------------------------------------------------------------------
 CREATE TABLE IF NOT EXISTS lab_requests (
@@ -934,7 +657,7 @@ CREATE TABLE IF NOT EXISTS lab_requests (
 );
 
 -- ------------------------------------------------------------------------------
--- 20. LAB REQUEST ITEMS TABLE
+-- 21. LAB REQUEST ITEMS TABLE
 -- Individual laboratory tests included within a diagnostic request.
 -- ------------------------------------------------------------------------------
 CREATE TABLE IF NOT EXISTS lab_request_items (
@@ -950,7 +673,7 @@ CREATE TABLE IF NOT EXISTS lab_request_items (
 );
 
 -- ------------------------------------------------------------------------------
--- 21. LAB SAMPLES TABLE
+-- 22. LAB SAMPLES TABLE
 -- Physical specimen collection, barcoding, and tracking records.
 -- ------------------------------------------------------------------------------
 CREATE TABLE IF NOT EXISTS lab_samples (
@@ -971,7 +694,7 @@ CREATE TABLE IF NOT EXISTS lab_samples (
 );
 
 -- ------------------------------------------------------------------------------
--- 22. LAB RESULTS TABLE
+-- 23. LAB RESULTS TABLE
 -- Quantitative and qualitative laboratory measurement values and findings.
 -- ------------------------------------------------------------------------------
 CREATE TABLE IF NOT EXISTS lab_results (
@@ -992,7 +715,7 @@ CREATE TABLE IF NOT EXISTS lab_results (
 );
 
 -- ------------------------------------------------------------------------------
--- 23. LAB REPORTS TABLE
+-- 24. LAB REPORTS TABLE
 -- Verified and finalized clinical diagnostic laboratory reports.
 -- ------------------------------------------------------------------------------
 CREATE TABLE IF NOT EXISTS lab_reports (
@@ -1012,7 +735,7 @@ CREATE TABLE IF NOT EXISTS lab_reports (
 );
 
 -- ------------------------------------------------------------------------------
--- INDEXES FOR LABORATORY MODULE
+-- INDEXES & TRIGGERS FOR MODULE 3.6 (LABORATORY MANAGEMENT)
 -- ------------------------------------------------------------------------------
 CREATE INDEX IF NOT EXISTS idx_lab_tests_code ON lab_tests(test_code);
 CREATE INDEX IF NOT EXISTS idx_lab_tests_category ON lab_tests(category);
@@ -1028,177 +751,49 @@ CREATE INDEX IF NOT EXISTS idx_lab_results_item ON lab_results(request_item_id);
 CREATE INDEX IF NOT EXISTS idx_lab_reports_number ON lab_reports(report_number);
 CREATE INDEX IF NOT EXISTS idx_lab_reports_request ON lab_reports(request_id);
 
--- ------------------------------------------------------------------------------
--- SEED DATA: LABORATORY CATALOG, TEST REQUEST, SAMPLE, RESULTS & REPORT
--- ------------------------------------------------------------------------------
-INSERT INTO lab_tests (test_code, test_name, category, sample_type, price, turnaround_time_hours, reference_range, unit, description, is_active)
-VALUES
-('LAB-CBC', 'Complete Blood Count (CBC)', 'HEMATOLOGY', 'BLOOD', 1500.00, 4, 'Varies by parameter', NULL, 'Comprehensive evaluation of RBC, WBC, Hemoglobin, Hematocrit and Platelet indices', TRUE),
-('LAB-FBS', 'Fasting Blood Sugar (FBS)', 'BIOCHEMISTRY', 'BLOOD', 500.00, 2, '70.0 - 99.0', 'mg/dL', 'Measures blood glucose concentration following minimum 8-hour fasting period', TRUE),
-('LAB-LIPID', 'Lipid Profile', 'BIOCHEMISTRY', 'BLOOD', 2200.00, 6, 'Cholesterol < 200, Triglycerides < 150', 'mg/dL', 'Serum lipids including Total Cholesterol, HDL, LDL, VLDL, and Triglycerides', TRUE),
-('LAB-LFT', 'Liver Function Test (LFT)', 'BIOCHEMISTRY', 'SERUM', 2500.00, 6, 'SGOT 15-40, SGPT 10-49, Bilirubin 0.2-1.2', 'U/L', 'Enzymatic screen of hepatic parenchymal integrity and biliary excretory capacity', TRUE),
-('LAB-CREAT', 'Serum Creatinine & eGFR', 'BIOCHEMISTRY', 'SERUM', 800.00, 3, '0.7 - 1.3', 'mg/dL', 'Renal clearance and glomerular filtration capacity biomarker', TRUE),
-('LAB-HBA1C', 'Glycated Hemoglobin (HbA1c)', 'HEMATOLOGY', 'BLOOD', 1800.00, 6, '4.0 - 5.6', '%', 'Long-term glycemic control evaluation reflecting average 3-month blood sugar', TRUE),
-('LAB-URINE', 'Urinalysis (Full Routine)', 'URINALYSIS', 'URINE', 600.00, 2, 'Yellow, Clear, pH 5.0-8.0, SG 1.005-1.030', NULL, 'Physical, chemical, and microscopic sediment analysis of clean catch urine', TRUE),
-('LAB-TSH', 'Thyroid Stimulating Hormone (TSH)', 'IMMUNOLOGY', 'SERUM', 1600.00, 8, '0.40 - 4.50', 'uIU/mL', 'Hypothalamic-pituitary-thyroid axis biomarker for hypothyroidism or hyperthyroidism', TRUE),
-('LAB-CRP', 'C-Reactive Protein (Quantitative)', 'IMMUNOLOGY', 'SERUM', 1200.00, 4, '< 5.0', 'mg/L', 'Acute-phase reactant marker indicating systemic inflammatory and infectious states', TRUE),
-('LAB-COVID', 'SARS-CoV-2 Antigen Rapid Test', 'MICROBIOLOGY', 'SWAB', 1200.00, 1, 'Negative', NULL, 'Rapid qualitative immunochromatographic assay for viral nucleocapsid antigen', TRUE)
-ON CONFLICT (test_code) DO NOTHING;
+DROP TRIGGER IF EXISTS trg_update_lab_tests_timestamp ON lab_tests;
+CREATE TRIGGER trg_update_lab_tests_timestamp
+BEFORE UPDATE ON lab_tests
+FOR EACH ROW
+EXECUTE FUNCTION update_timestamp_column();
 
--- Seed Sample Request for PAT-10001
-INSERT INTO lab_requests (
-    request_number, patient_id, doctor_id, priority, status, clinical_notes, requested_at
-)
-SELECT
-    'LRQ-10001',
-    p.id,
-    d.id,
-    'URGENT',
-    'COMPLETED',
-    'Patient with stage 1 hypertension and mild chest tightness. Routine baseline hematology and fasting lipid assessment requested.',
-    CURRENT_TIMESTAMP - INTERVAL '1 day'
-FROM patients p, doctors d
-WHERE p.patient_number = 'PAT-10001' AND d.doctor_number = 'DOC-10001'
-ON CONFLICT (request_number) DO NOTHING;
+DROP TRIGGER IF EXISTS trg_update_lab_requests_timestamp ON lab_requests;
+CREATE TRIGGER trg_update_lab_requests_timestamp
+BEFORE UPDATE ON lab_requests
+FOR EACH ROW
+EXECUTE FUNCTION update_timestamp_column();
 
--- Seed Sample Request Items
-INSERT INTO lab_request_items (request_id, lab_test_id, status, notes)
-SELECT
-    lr.id,
-    lt.id,
-    'COMPLETED',
-    'Priority processing requested by cardiologist'
-FROM lab_requests lr, lab_tests lt
-WHERE lr.request_number = 'LRQ-10001' AND lt.test_code IN ('LAB-CBC', 'LAB-LIPID')
-ON CONFLICT DO NOTHING;
+DROP TRIGGER IF EXISTS trg_update_lab_request_items_timestamp ON lab_request_items;
+CREATE TRIGGER trg_update_lab_request_items_timestamp
+BEFORE UPDATE ON lab_request_items
+FOR EACH ROW
+EXECUTE FUNCTION update_timestamp_column();
 
--- Seed Sample Collection
-INSERT INTO lab_samples (sample_barcode, request_id, sample_type, collected_at, collection_site, status, notes)
-SELECT
-    'SMP-20261026-0001',
-    lr.id,
-    'BLOOD',
-    CURRENT_TIMESTAMP - INTERVAL '20 hours',
-    'Left antecubital fossa',
-    'RECEIVED_IN_LAB',
-    'Collected in EDTA tube and SST Gel tube without hemolysis'
-FROM lab_requests lr
-WHERE lr.request_number = 'LRQ-10001'
-ON CONFLICT (sample_barcode) DO NOTHING;
+DROP TRIGGER IF EXISTS trg_update_lab_samples_timestamp ON lab_samples;
+CREATE TRIGGER trg_update_lab_samples_timestamp
+BEFORE UPDATE ON lab_samples
+FOR EACH ROW
+EXECUTE FUNCTION update_timestamp_column();
 
--- Seed Result Parameters for CBC
-INSERT INTO lab_results (request_item_id, parameter_name, result_value, reference_range, unit, flag, notes)
-SELECT
-    lri.id,
-    'Hemoglobin',
-    '14.5',
-    '13.0 - 17.0',
-    'g/dL',
-    'NORMAL',
-    'Optimal oxygen carrying capacity'
-FROM lab_request_items lri
-JOIN lab_requests lr ON lri.request_id = lr.id
-JOIN lab_tests lt ON lri.lab_test_id = lt.id
-WHERE lr.request_number = 'LRQ-10001' AND lt.test_code = 'LAB-CBC'
-ON CONFLICT DO NOTHING;
+DROP TRIGGER IF EXISTS trg_update_lab_results_timestamp ON lab_results;
+CREATE TRIGGER trg_update_lab_results_timestamp
+BEFORE UPDATE ON lab_results
+FOR EACH ROW
+EXECUTE FUNCTION update_timestamp_column();
 
-INSERT INTO lab_results (request_item_id, parameter_name, result_value, reference_range, unit, flag, notes)
-SELECT
-    lri.id,
-    'White Blood Cells (WBC)',
-    '7,200',
-    '4,500 - 11,000',
-    '/uL',
-    'NORMAL',
-    'Normal total leukocyte count'
-FROM lab_request_items lri
-JOIN lab_requests lr ON lri.request_id = lr.id
-JOIN lab_tests lt ON lri.lab_test_id = lt.id
-WHERE lr.request_number = 'LRQ-10001' AND lt.test_code = 'LAB-CBC'
-ON CONFLICT DO NOTHING;
+DROP TRIGGER IF EXISTS trg_update_lab_reports_timestamp ON lab_reports;
+CREATE TRIGGER trg_update_lab_reports_timestamp
+BEFORE UPDATE ON lab_reports
+FOR EACH ROW
+EXECUTE FUNCTION update_timestamp_column();
 
-INSERT INTO lab_results (request_item_id, parameter_name, result_value, reference_range, unit, flag, notes)
-SELECT
-    lri.id,
-    'Platelets',
-    '265,000',
-    '150,000 - 450,000',
-    '/uL',
-    'NORMAL',
-    'Platelet aggregation normal'
-FROM lab_request_items lri
-JOIN lab_requests lr ON lri.request_id = lr.id
-JOIN lab_tests lt ON lri.lab_test_id = lt.id
-WHERE lr.request_number = 'LRQ-10001' AND lt.test_code = 'LAB-CBC'
-ON CONFLICT DO NOTHING;
-
--- Seed Result Parameters for Lipid Profile
-INSERT INTO lab_results (request_item_id, parameter_name, result_value, reference_range, unit, flag, notes)
-SELECT
-    lri.id,
-    'Total Cholesterol',
-    '228.0',
-    '< 200.0',
-    'mg/dL',
-    'HIGH',
-    'Borderline elevated total cholesterol'
-FROM lab_request_items lri
-JOIN lab_requests lr ON lri.request_id = lr.id
-JOIN lab_tests lt ON lri.lab_test_id = lt.id
-WHERE lr.request_number = 'LRQ-10001' AND lt.test_code = 'LAB-LIPID'
-ON CONFLICT DO NOTHING;
-
-INSERT INTO lab_results (request_item_id, parameter_name, result_value, reference_range, unit, flag, notes)
-SELECT
-    lri.id,
-    'Triglycerides',
-    '175.0',
-    '< 150.0',
-    'mg/dL',
-    'HIGH',
-    'Mild hypertriglyceridemia'
-FROM lab_request_items lri
-JOIN lab_requests lr ON lri.request_id = lr.id
-JOIN lab_tests lt ON lri.lab_test_id = lt.id
-WHERE lr.request_number = 'LRQ-10001' AND lt.test_code = 'LAB-LIPID'
-ON CONFLICT DO NOTHING;
-
-INSERT INTO lab_results (request_item_id, parameter_name, result_value, reference_range, unit, flag, notes)
-SELECT
-    lri.id,
-    'HDL Cholesterol',
-    '44.0',
-    '> 40.0',
-    'mg/dL',
-    'NORMAL',
-    'Adequate protective high-density lipoprotein level'
-FROM lab_request_items lri
-JOIN lab_requests lr ON lri.request_id = lr.id
-JOIN lab_tests lt ON lri.lab_test_id = lt.id
-WHERE lr.request_number = 'LRQ-10001' AND lt.test_code = 'LAB-LIPID'
-ON CONFLICT DO NOTHING;
-
--- Seed Finalized Diagnostic Report
-INSERT INTO lab_reports (
-    report_number, request_id, report_date, summary, comments, status
-)
-SELECT
-    'LRPT-10001',
-    lr.id,
-    CURRENT_TIMESTAMP - INTERVAL '6 hours',
-    'Hematology profile unremarkable with normal hemoglobin and leukocyte levels. Lipid panel demonstrates moderate hypercholesterolemia and mild hypertriglyceridemia.',
-    'Correlate with cardiovascular risk assessment. Dietary lipid moderation and follow-up lipid screening advised in 8 weeks.',
-    'FINALIZED'
-FROM lab_requests lr
-WHERE lr.request_number = 'LRQ-10001'
-ON CONFLICT (report_number) DO NOTHING;
 
 -- ==============================================================================
 -- Module 3.7 - Pharmacy Management
 -- ==============================================================================
 
 -- ------------------------------------------------------------------------------
--- 24. MEDICINES TABLE (INVENTORY & DRUG CATALOG)
+-- 25. MEDICINES TABLE (INVENTORY & DRUG CATALOG)
 -- Core formulary and medicine master maintaining drug specifications, classifications,
 -- pricing, and minimum stock threshold levels.
 -- ------------------------------------------------------------------------------
@@ -1254,7 +849,7 @@ CREATE TABLE IF NOT EXISTS medicines (
 );
 
 -- ------------------------------------------------------------------------------
--- 25. MEDICINE BATCHES TABLE (STOCK & EXPIRY TRACKING)
+-- 26. MEDICINE BATCHES TABLE (STOCK & EXPIRY TRACKING)
 -- Tracks specific procurement lots, supplier information, purchase costs,
 -- manufacturing/expiration dates, and remaining physical stock for FEFO management.
 -- ------------------------------------------------------------------------------
@@ -1280,7 +875,7 @@ CREATE TABLE IF NOT EXISTS medicine_batches (
 );
 
 -- ------------------------------------------------------------------------------
--- 26. PHARMACY DISPENSATIONS TABLE (PRESCRIPTION FULFILLMENT & OTC SALES)
+-- 27. PHARMACY DISPENSATIONS TABLE (PRESCRIPTION FULFILLMENT & OTC SALES)
 -- Header records documenting prescription-based or direct over-the-counter dispensing,
 -- pharmacist accountability, and financial totals.
 -- ------------------------------------------------------------------------------
@@ -1306,7 +901,7 @@ CREATE TABLE IF NOT EXISTS pharmacy_dispensations (
 );
 
 -- ------------------------------------------------------------------------------
--- 27. PHARMACY DISPENSATION ITEMS TABLE
+-- 28. PHARMACY DISPENSATION ITEMS TABLE
 -- Line items of medications issued under a dispensation, mapped to the specific batch.
 -- ------------------------------------------------------------------------------
 CREATE TABLE IF NOT EXISTS pharmacy_dispensation_items (
@@ -1323,7 +918,7 @@ CREATE TABLE IF NOT EXISTS pharmacy_dispensation_items (
 );
 
 -- ------------------------------------------------------------------------------
--- 28. PHARMACY STOCK TRANSACTIONS TABLE
+-- 29. PHARMACY STOCK TRANSACTIONS TABLE
 -- Complete inventory ledger logging every quantity change, adjustment, and disposal.
 -- ------------------------------------------------------------------------------
 CREATE TABLE IF NOT EXISTS pharmacy_stock_transactions (
@@ -1342,7 +937,7 @@ CREATE TABLE IF NOT EXISTS pharmacy_stock_transactions (
 );
 
 -- ------------------------------------------------------------------------------
--- INDEXES FOR PHARMACY MODULE
+-- INDEXES & TRIGGERS FOR MODULE 3.7 (PHARMACY MANAGEMENT)
 -- ------------------------------------------------------------------------------
 CREATE INDEX IF NOT EXISTS idx_medicines_code ON medicines(medicine_code);
 CREATE INDEX IF NOT EXISTS idx_medicines_name ON medicines(name);
@@ -1368,9 +963,6 @@ CREATE INDEX IF NOT EXISTS idx_stock_tx_med ON pharmacy_stock_transactions(medic
 CREATE INDEX IF NOT EXISTS idx_stock_tx_batch ON pharmacy_stock_transactions(batch_id);
 CREATE INDEX IF NOT EXISTS idx_stock_tx_date ON pharmacy_stock_transactions(created_at);
 
--- ------------------------------------------------------------------------------
--- TRIGGERS FOR TIMESTAMP UPDATES
--- ------------------------------------------------------------------------------
 DROP TRIGGER IF EXISTS trg_update_medicines_timestamp ON medicines;
 CREATE TRIGGER trg_update_medicines_timestamp
 BEFORE UPDATE ON medicines
@@ -1389,237 +981,13 @@ BEFORE UPDATE ON pharmacy_dispensations
 FOR EACH ROW
 EXECUTE FUNCTION update_timestamp_column();
 
--- ------------------------------------------------------------------------------
--- SEED DATA: PHARMACY MEDICINES FORMULARY
--- ------------------------------------------------------------------------------
-INSERT INTO medicines (
-    medicine_code, name, generic_name, brand_name, category, dosage_form,
-    strength, unit_of_measure, unit_price, reorder_level, manufacturer,
-    storage_conditions, description, side_effects, is_active
-) VALUES
-('MED-10001', 'Paracetamol 500mg', 'Paracetamol', 'Panadol', 'ANALGESIC', 'TABLET', '500 mg', 'TABLET', 5.00, 200, 'GSK Healthcare', 'Store below 30°C in dry place', 'Antipyretic and mild analgesic indicated for fever and mild to moderate pain.', 'Rare nausea, hypersensitivity reactions.', TRUE),
-('MED-10002', 'Amoxicillin 500mg', 'Amoxicillin Trihydrate', 'Amoxil', 'ANTIBIOTIC', 'CAPSULE', '500 mg', 'CAPSULE', 25.00, 100, 'Pfizer Ltd', 'Store below 25°C protected from moisture', 'Broad spectrum penicillin antibiotic indicated for respiratory and ENT bacterial infections.', 'Nausea, diarrhea, allergic skin rash.', TRUE),
-('MED-10003', 'Amlodipine 5mg', 'Amlodipine Besylate', 'Norvasc', 'ANTIHYPERTENSIVE', 'TABLET', '5 mg', 'TABLET', 18.00, 150, 'Novartis Pharma', 'Store at room temperature 15-30°C', 'Calcium channel blocker for essential hypertension and chronic stable angina.', 'Peripheral edema, flushing, headache, dizziness.', TRUE),
-('MED-10004', 'Metformin 500mg', 'Metformin Hydrochloride', 'Glucophage', 'ANTIDIABETIC', 'TABLET', '500 mg', 'TABLET', 12.00, 150, 'Merck Sante', 'Store below 25°C', 'Biguanide antihyperglycemic agent for Type 2 Diabetes Mellitus management.', 'Gastrointestinal upset, metallic taste, lactic acidosis (rare).', TRUE),
-('MED-10005', 'Omeprazole 20mg', 'Omeprazole', 'Losec', 'GASTROINTESTINAL', 'CAPSULE', '20 mg', 'CAPSULE', 22.00, 100, 'AstraZeneca', 'Store in tight container away from moisture', 'Proton pump inhibitor (PPI) for GERD, dyspepsia, and peptic ulcer disease.', 'Headache, abdominal pain, flatulence, constipation.', TRUE),
-('MED-10006', 'Cetirizine 10mg', 'Cetirizine Dihydrochloride', 'Zyrtec', 'ANTIHISTAMINE', 'TABLET', '10 mg', 'TABLET', 15.00, 80, 'Johnson & Johnson', 'Store below 30°C', 'Second generation H1-antihistamine for allergic rhinitis, urticaria, and pruritus.', 'Mild drowsiness, dry mouth, fatigue.', TRUE),
-('MED-10007', 'Atorvastatin 20mg', 'Atorvastatin Calcium', 'Lipitor', 'CARDIOVASCULAR', 'TABLET', '20 mg', 'TABLET', 45.00, 80, 'Pfizer Ltd', 'Store between 20-25°C', 'HMG-CoA reductase inhibitor statin indicated for dyslipidemia and cardiovascular prevention.', 'Myalgia, headache, mild elevation in liver enzymes.', TRUE),
-('MED-10008', 'Salbutamol Inhaler 100mcg', 'Salbutamol Sulfate', 'Ventolin Evohaler', 'RESPIRATORY', 'INHALER', '100 mcg/dose', 'PIECE', 650.00, 20, 'GSK Healthcare', 'Do not freeze or expose to direct heat', 'Short-acting beta-2 adrenergic agonist bronchodilator for acute asthma bronchospasm.', 'Fine tremors, tachycardia, mild palpitations.', TRUE),
-('MED-10009', 'Azithromycin 500mg', 'Azithromycin', 'Zithromax', 'ANTIBIOTIC', 'TABLET', '500 mg', 'TABLET', 95.00, 50, 'Pfizer Ltd', 'Store below 30°C', 'Macrolide antibiotic for community-acquired pneumonia and atypical bacterial infections.', 'Gastrointestinal cramping, nausea, diarrhea.', TRUE),
-('MED-10010', 'Vitamin C 500mg', 'Ascorbic Acid', 'C-Vite', 'VITAMINS_SUPPLEMENTS', 'TABLET', '500 mg', 'TABLET', 8.00, 200, 'Astron Health', 'Keep tightly closed in a cool dry area', 'Antioxidant and essential vitamin for immune defense and connective tissue repair.', 'Minimal side effects at recommended dosages.', TRUE),
-('MED-10011', 'Aspirin 75mg', 'Acetylsalicylic Acid', 'Cardiprin', 'CARDIOVASCULAR', 'TABLET', '75 mg', 'TABLET', 10.00, 150, 'Bayer AG', 'Store below 25°C', 'Antiplatelet agent for secondary prevention of thromboembolic and ischemic heart events.', 'Gastric irritation, micro-bleeding risk.', TRUE)
-ON CONFLICT (medicine_code) DO NOTHING;
-
--- ------------------------------------------------------------------------------
--- SEED DATA: MEDICINE BATCHES (STOCK, FEFO & EXPIRY MONITORING EXAMPLES)
--- ------------------------------------------------------------------------------
--- Active batch for Paracetamol (Plenty of stock)
-INSERT INTO medicine_batches (
-    batch_number, medicine_id, manufacture_date, expiry_date,
-    initial_quantity, current_quantity, unit_purchase_price, unit_selling_price,
-    supplier_name, received_date, status, notes
-)
-SELECT
-    'BAT-2026-PARA01', m.id, CURRENT_DATE - INTERVAL '6 months', CURRENT_DATE + INTERVAL '18 months',
-    1000, 850, 3.20, 5.00, 'State Pharmaceuticals Corp', CURRENT_DATE - INTERVAL '5 months', 'ACTIVE', 'Prime inventory batch'
-FROM medicines m WHERE m.medicine_code = 'MED-10001'
-ON CONFLICT (medicine_id, batch_number) DO NOTHING;
-
--- Amoxicillin: Batch 1 expiring in 25 days (EXPIRING SOON alert test)
-INSERT INTO medicine_batches (
-    batch_number, medicine_id, manufacture_date, expiry_date,
-    initial_quantity, current_quantity, unit_purchase_price, unit_selling_price,
-    supplier_name, received_date, status, notes
-)
-SELECT
-    'BAT-2025-AMX01', m.id, CURRENT_DATE - INTERVAL '18 months', CURRENT_DATE + INTERVAL '25 days',
-    500, 120, 18.00, 25.00, 'MediLink Distributors', CURRENT_DATE - INTERVAL '17 months', 'ACTIVE', 'Nearing expiry - prioritize FEFO dispensing'
-FROM medicines m WHERE m.medicine_code = 'MED-10002'
-ON CONFLICT (medicine_id, batch_number) DO NOTHING;
-
--- Amoxicillin: Fresh batch expiring in 14 months
-INSERT INTO medicine_batches (
-    batch_number, medicine_id, manufacture_date, expiry_date,
-    initial_quantity, current_quantity, unit_purchase_price, unit_selling_price,
-    supplier_name, received_date, status, notes
-)
-SELECT
-    'BAT-2026-AMX02', m.id, CURRENT_DATE - INTERVAL '2 months', CURRENT_DATE + INTERVAL '14 months',
-    600, 600, 19.50, 25.00, 'MediLink Distributors', CURRENT_DATE - INTERVAL '1 month', 'ACTIVE', 'New replenishment consignment'
-FROM medicines m WHERE m.medicine_code = 'MED-10002'
-ON CONFLICT (medicine_id, batch_number) DO NOTHING;
-
--- Amlodipine 5mg: Normal active batch
-INSERT INTO medicine_batches (
-    batch_number, medicine_id, manufacture_date, expiry_date,
-    initial_quantity, current_quantity, unit_purchase_price, unit_selling_price,
-    supplier_name, received_date, status, notes
-)
-SELECT
-    'BAT-2026-AML01', m.id, CURRENT_DATE - INTERVAL '4 months', CURRENT_DATE + INTERVAL '16 months',
-    800, 520, 12.00, 18.00, 'PharmaNet Lanka', CURRENT_DATE - INTERVAL '3 months', 'ACTIVE', 'Good stock level'
-FROM medicines m WHERE m.medicine_code = 'MED-10003'
-ON CONFLICT (medicine_id, batch_number) DO NOTHING;
-
--- Metformin 500mg: Active batch
-INSERT INTO medicine_batches (
-    batch_number, medicine_id, manufacture_date, expiry_date,
-    initial_quantity, current_quantity, unit_purchase_price, unit_selling_price,
-    supplier_name, received_date, status, notes
-)
-SELECT
-    'BAT-2026-MET01', m.id, CURRENT_DATE - INTERVAL '5 months', CURRENT_DATE + INTERVAL '12 months',
-    500, 310, 8.50, 12.00, 'Merck Direct', CURRENT_DATE - INTERVAL '4 months', 'ACTIVE', 'Routine clinic issue'
-FROM medicines m WHERE m.medicine_code = 'MED-10004'
-ON CONFLICT (medicine_id, batch_number) DO NOTHING;
-
--- Omeprazole 20mg: Active batch
-INSERT INTO medicine_batches (
-    batch_number, medicine_id, manufacture_date, expiry_date,
-    initial_quantity, current_quantity, unit_purchase_price, unit_selling_price,
-    supplier_name, received_date, status, notes
-)
-SELECT
-    'BAT-2026-OMP01', m.id, CURRENT_DATE - INTERVAL '3 months', CURRENT_DATE + INTERVAL '20 months',
-    400, 260, 14.00, 22.00, 'AstraZeneca Imports', CURRENT_DATE - INTERVAL '2 months', 'ACTIVE', 'Standard stock'
-FROM medicines m WHERE m.medicine_code = 'MED-10005'
-ON CONFLICT (medicine_id, batch_number) DO NOTHING;
-
--- Cetirizine 10mg: Batch already EXPIRED 15 days ago (EXPIRED alert test)
-INSERT INTO medicine_batches (
-    batch_number, medicine_id, manufacture_date, expiry_date,
-    initial_quantity, current_quantity, unit_purchase_price, unit_selling_price,
-    supplier_name, received_date, status, notes
-)
-SELECT
-    'BAT-2024-CET-EXP', m.id, CURRENT_DATE - INTERVAL '25 months', CURRENT_DATE - INTERVAL '15 days',
-    300, 45, 9.00, 15.00, 'Johnson Distribution', CURRENT_DATE - INTERVAL '24 months', 'EXPIRED', 'Expired lot marked for safe bio-disposal'
-FROM medicines m WHERE m.medicine_code = 'MED-10006'
-ON CONFLICT (medicine_id, batch_number) DO NOTHING;
-
--- Cetirizine 10mg: Fresh replacement batch
-INSERT INTO medicine_batches (
-    batch_number, medicine_id, manufacture_date, expiry_date,
-    initial_quantity, current_quantity, unit_purchase_price, unit_selling_price,
-    supplier_name, received_date, status, notes
-)
-SELECT
-    'BAT-2026-CET02', m.id, CURRENT_DATE - INTERVAL '1 month', CURRENT_DATE + INTERVAL '22 months',
-    500, 480, 9.50, 15.00, 'Johnson Distribution', CURRENT_DATE - INTERVAL '15 days', 'ACTIVE', 'Active inventory'
-FROM medicines m WHERE m.medicine_code = 'MED-10006'
-ON CONFLICT (medicine_id, batch_number) DO NOTHING;
-
--- Salbutamol Inhaler: LOW STOCK demonstration (current_quantity 8, reorder level 20)
-INSERT INTO medicine_batches (
-    batch_number, medicine_id, manufacture_date, expiry_date,
-    initial_quantity, current_quantity, unit_purchase_price, unit_selling_price,
-    supplier_name, received_date, status, notes
-)
-SELECT
-    'BAT-2026-SLB01', m.id, CURRENT_DATE - INTERVAL '6 months', CURRENT_DATE + INTERVAL '10 months',
-    50, 8, 480.00, 650.00, 'GSK Lanka', CURRENT_DATE - INTERVAL '5 months', 'ACTIVE', 'Low stock alert triggered - replenishment requested'
-FROM medicines m WHERE m.medicine_code = 'MED-10008'
-ON CONFLICT (medicine_id, batch_number) DO NOTHING;
-
--- Aspirin 75mg: Batch for cardiovascular clinic
-INSERT INTO medicine_batches (
-    batch_number, medicine_id, manufacture_date, expiry_date,
-    initial_quantity, current_quantity, unit_purchase_price, unit_selling_price,
-    supplier_name, received_date, status, notes
-)
-SELECT
-    'BAT-2026-ASP01', m.id, CURRENT_DATE - INTERVAL '3 months', CURRENT_DATE + INTERVAL '15 months',
-    600, 450, 6.00, 10.00, 'Bayer Lanka', CURRENT_DATE - INTERVAL '2 months', 'ACTIVE', 'Regular issue'
-FROM medicines m WHERE m.medicine_code = 'MED-10011'
-ON CONFLICT (medicine_id, batch_number) DO NOTHING;
-
--- ------------------------------------------------------------------------------
--- SEED DATA: INITIAL STOCK TRANSACTIONS (AUDIT LEDGER)
--- ------------------------------------------------------------------------------
-INSERT INTO pharmacy_stock_transactions (
-    medicine_id, batch_id, transaction_type, quantity, balance_after, reference_number, notes
-)
-SELECT
-    m.id, b.id, 'PURCHASE_RECEIPT', 1000, 1000, 'PO-2026-001', 'Initial consignment delivery'
-FROM medicines m
-JOIN medicine_batches b ON b.medicine_id = m.id AND b.batch_number = 'BAT-2026-PARA01'
-WHERE m.medicine_code = 'MED-10001'
-ON CONFLICT DO NOTHING;
-
-INSERT INTO pharmacy_stock_transactions (
-    medicine_id, batch_id, transaction_type, quantity, balance_after, reference_number, notes
-)
-SELECT
-    m.id, b.id, 'PURCHASE_RECEIPT', 800, 800, 'PO-2026-002', 'Initial shipment'
-FROM medicines m
-JOIN medicine_batches b ON b.medicine_id = m.id AND b.batch_number = 'BAT-2026-AML01'
-WHERE m.medicine_code = 'MED-10003'
-ON CONFLICT DO NOTHING;
-
--- ------------------------------------------------------------------------------
--- SEED DATA: SAMPLE PHARMACY DISPENSATION
--- ------------------------------------------------------------------------------
-INSERT INTO pharmacy_dispensations (
-    dispensation_number, prescription_id, patient_id, patient_name, doctor_name,
-    dispensed_at, total_amount, payment_status, status, notes
-)
-SELECT
-    'DSP-10001', rx.id, p.id,
-    p.first_name || ' ' || p.last_name,
-    d.first_name || ' ' || d.last_name,
-    CURRENT_TIMESTAMP - INTERVAL '18 hours',
-    840.00, 'PAID', 'COMPLETED',
-    'Prescription fulfilled in full with patient counseling provided.'
-FROM prescriptions rx
-JOIN patients p ON rx.patient_id = p.id
-JOIN doctors d ON rx.doctor_id = d.id
-WHERE rx.prescription_number = 'RX-10001'
-ON CONFLICT (dispensation_number) DO NOTHING;
-
--- Dispensation items
-INSERT INTO pharmacy_dispensation_items (
-    dispensation_id, medicine_id, batch_id, quantity, unit_price, subtotal, dosage_instructions
-)
-SELECT
-    d.id, m.id, b.id, 30, 18.00, 540.00, '1 tablet every morning with or without food'
-FROM pharmacy_dispensations d
-JOIN medicines m ON m.medicine_code = 'MED-10003'
-JOIN medicine_batches b ON b.medicine_id = m.id AND b.batch_number = 'BAT-2026-AML01'
-WHERE d.dispensation_number = 'DSP-10001'
-ON CONFLICT DO NOTHING;
-
-INSERT INTO pharmacy_dispensation_items (
-    dispensation_id, medicine_id, batch_id, quantity, unit_price, subtotal, dosage_instructions
-)
-SELECT
-    d.id, m.id, b.id, 30, 10.00, 300.00, '1 tablet after dinner with a full glass of water'
-FROM pharmacy_dispensations d
-JOIN medicines m ON m.medicine_code = 'MED-10011'
-JOIN medicine_batches b ON b.medicine_id = m.id AND b.batch_number = 'BAT-2026-ASP01'
-WHERE d.dispensation_number = 'DSP-10001'
-ON CONFLICT DO NOTHING;
-
--- Deduct from stock transaction for sample dispensation
-INSERT INTO pharmacy_stock_transactions (
-    medicine_id, batch_id, transaction_type, quantity, balance_after, reference_number, notes
-)
-SELECT
-    m.id, b.id, 'DISPENSE', -30, b.current_quantity, 'DSP-10001', 'Dispensed against prescription RX-10001'
-FROM medicines m
-JOIN medicine_batches b ON b.medicine_id = m.id AND b.batch_number = 'BAT-2026-AML01'
-WHERE m.medicine_code = 'MED-10003'
-ON CONFLICT DO NOTHING;
-
-
-
-
 
 -- ==============================================================================
 -- Module 3.8 - Billing System (Admissions, Invoices, Charges & Payments)
 -- ==============================================================================
 
 -- ------------------------------------------------------------------------------
--- 29. ADMISSIONS TABLE (INPATIENT STAYS & WARD/BED CHARGES)
+-- 30. ADMISSIONS TABLE (INPATIENT STAYS & WARD/BED CHARGES)
 -- Tracks inpatient admissions, ward/room allocation, daily room & nursing tariffs,
 -- length of stay, and discharge details for admission charge calculation.
 -- ------------------------------------------------------------------------------
@@ -1657,7 +1025,7 @@ CREATE TABLE IF NOT EXISTS admissions (
 );
 
 -- ------------------------------------------------------------------------------
--- 30. BILLING INVOICES TABLE (INVOICE GENERATION & FINANCIAL HEADERS)
+-- 31. BILLING INVOICES TABLE (INVOICE GENERATION & FINANCIAL HEADERS)
 -- Central billing invoice header consolidating consultation, laboratory,
 -- pharmacy, and admission charges with tax, discounts, and payment balance.
 -- ------------------------------------------------------------------------------
@@ -1685,7 +1053,7 @@ CREATE TABLE IF NOT EXISTS billing_invoices (
 );
 
 -- ------------------------------------------------------------------------------
--- 31. BILLING INVOICE ITEMS TABLE (CONSULTATION, LAB, PHARMACY & ADMISSION CHARGES)
+-- 32. BILLING INVOICE ITEMS TABLE (CONSULTATION, LAB, PHARMACY & ADMISSION CHARGES)
 -- Line items breaking down charges by category with source reference links.
 -- ------------------------------------------------------------------------------
 CREATE TABLE IF NOT EXISTS billing_invoice_items (
@@ -1707,7 +1075,7 @@ CREATE TABLE IF NOT EXISTS billing_invoice_items (
 );
 
 -- ------------------------------------------------------------------------------
--- 32. BILLING PAYMENTS TABLE (PAYMENT RECORDING & RECEIPTS)
+-- 33. BILLING PAYMENTS TABLE (PAYMENT RECORDING & RECEIPTS)
 -- Records full or installment payments against invoices across multiple payment modes.
 -- ------------------------------------------------------------------------------
 CREATE TABLE IF NOT EXISTS billing_payments (
@@ -1734,7 +1102,7 @@ CREATE TABLE IF NOT EXISTS billing_payments (
 );
 
 -- ------------------------------------------------------------------------------
--- INDEXES FOR BILLING & ADMISSIONS MODULE
+-- INDEXES & TRIGGERS FOR MODULE 3.8 (BILLING & ADMISSIONS)
 -- ------------------------------------------------------------------------------
 CREATE INDEX IF NOT EXISTS idx_admissions_number ON admissions(admission_number);
 CREATE INDEX IF NOT EXISTS idx_admissions_patient ON admissions(patient_id);
@@ -1758,9 +1126,6 @@ CREATE INDEX IF NOT EXISTS idx_billing_payments_patient ON billing_payments(pati
 CREATE INDEX IF NOT EXISTS idx_billing_payments_method ON billing_payments(payment_method);
 CREATE INDEX IF NOT EXISTS idx_billing_payments_date ON billing_payments(payment_date);
 
--- ------------------------------------------------------------------------------
--- TRIGGERS FOR BILLING & ADMISSIONS TIMESTAMPS
--- ------------------------------------------------------------------------------
 DROP TRIGGER IF EXISTS trg_update_admissions_timestamp ON admissions;
 CREATE TRIGGER trg_update_admissions_timestamp
 BEFORE UPDATE ON admissions
@@ -1779,164 +1144,234 @@ BEFORE UPDATE ON billing_payments
 FOR EACH ROW
 EXECUTE FUNCTION update_timestamp_column();
 
+
+-- ==============================================================================
+-- Module 3.9 - Staff Management (Employees, Attendance, Department Assignment & Leave Records)
+-- ==============================================================================
+
 -- ------------------------------------------------------------------------------
--- SEED DATA: ADMISSIONS, INVOICES, ITEMIZED CHARGES & PAYMENTS
+-- 34. STAFF EMPLOYEES TABLE (EMPLOYEE REGISTRATION & PROFILES)
+-- Central human resources registry for nurses, lab technologists, pharmacists,
+-- receptionists, accountants, doctors, and administrative/support personnel.
 -- ------------------------------------------------------------------------------
-INSERT INTO admissions (
-    admission_number, patient_id, attending_doctor_id, department_id,
-    ward_name, room_type, bed_number, admission_date, discharge_date,
-    daily_room_rate, nursing_fee_per_day, admission_reason, discharge_notes, status
-)
-SELECT
-    'ADM-10001',
-    p.id,
-    d.id,
-    d.department_id,
-    'Cardiology Observation Ward',
-    'SEMI_PRIVATE',
-    'C-104B',
-    CURRENT_TIMESTAMP - INTERVAL '2 days',
-    CURRENT_TIMESTAMP - INTERVAL '4 hours',
-    6500.00,
-    1500.00,
-    '24-hour blood pressure & cardiac telemetry monitoring for Stage 1 Hypertension with exertional chest tightness.',
-    'Hemodynamically stable. Discharged on oral antihypertensive regimen with outpatient follow-up.',
-    'DISCHARGED'
-FROM patients p, doctors d
-WHERE p.patient_number = 'PAT-10001' AND d.doctor_number = 'DOC-10001'
-ON CONFLICT (admission_number) DO NOTHING;
+CREATE TABLE IF NOT EXISTS staff_employees (
+    id BIGSERIAL PRIMARY KEY,
+    employee_number VARCHAR(30) NOT NULL UNIQUE,
+    user_id BIGINT REFERENCES users(id) ON DELETE SET NULL,
+    first_name VARCHAR(50) NOT NULL,
+    last_name VARCHAR(50) NOT NULL,
+    nic_or_passport VARCHAR(50) NOT NULL UNIQUE,
+    gender VARCHAR(20) NOT NULL CHECK (gender IN ('MALE', 'FEMALE', 'OTHER')),
+    date_of_birth DATE,
+    contact_number VARCHAR(20) NOT NULL,
+    email VARCHAR(100) NOT NULL UNIQUE,
+    address TEXT,
+    emergency_contact_name VARCHAR(100),
+    emergency_contact_number VARCHAR(20),
+    role_category VARCHAR(40) NOT NULL CHECK (
+        role_category IN (
+            'DOCTOR',
+            'NURSE',
+            'RECEPTIONIST',
+            'LABORATORY_STAFF',
+            'PHARMACIST',
+            'ACCOUNTANT',
+            'ADMINISTRATIVE',
+            'SUPPORT_STAFF'
+        )
+    ),
+    designation VARCHAR(100) NOT NULL,
+    department_id BIGINT NOT NULL REFERENCES departments(id) ON DELETE RESTRICT,
+    employment_type VARCHAR(30) NOT NULL DEFAULT 'FULL_TIME' CHECK (
+        employment_type IN ('FULL_TIME', 'PART_TIME', 'CONTRACT', 'VISITING', 'INTERN')
+    ),
+    shift_type VARCHAR(30) NOT NULL DEFAULT 'REGULAR_DAY' CHECK (
+        shift_type IN ('MORNING', 'EVENING', 'NIGHT', 'ROTATIONAL', 'REGULAR_DAY')
+    ),
+    join_date DATE NOT NULL DEFAULT CURRENT_DATE,
+    basic_salary NUMERIC(12, 2) NOT NULL DEFAULT 0.00,
+    qualification VARCHAR(200),
+    status VARCHAR(30) NOT NULL DEFAULT 'ACTIVE' CHECK (
+        status IN ('ACTIVE', 'ON_LEAVE', 'SUSPENDED', 'RESIGNED', 'TERMINATED')
+    ),
+    annual_leave_quota INT NOT NULL DEFAULT 14,
+    casual_leave_quota INT NOT NULL DEFAULT 7,
+    sick_leave_quota INT NOT NULL DEFAULT 7,
+    notes TEXT,
+    registered_by BIGINT REFERENCES users(id) ON DELETE SET NULL,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
 
--- Seed Consolidated Invoice for PAT-10001 (Consultation + Lab + Pharmacy + Admission Charges)
-INSERT INTO billing_invoices (
-    invoice_number, patient_id, appointment_id, admission_id,
-    issue_date, due_date, subtotal, discount_amount, tax_amount,
-    total_amount, paid_amount, balance_due, status, notes
-)
-SELECT
-    'INV-10001',
-    p.id,
-    a.id,
-    adm.id,
-    CURRENT_TIMESTAMP - INTERVAL '3 hours',
-    CURRENT_DATE + INTERVAL '7 days',
-    24040.00,
-    1040.00,
-    0.00,
-    23000.00,
-    15000.00,
-    8000.00,
-    'PARTIALLY_PAID',
-    'Consolidated hospital bill covering Cardiology Consultation, Hematology & Lipid Lab Panel, Pharmacy Medications, and 2-Day Cardiac Observation Admission.'
-FROM patients p
-LEFT JOIN appointments a ON a.appointment_number = 'APT-10001'
-LEFT JOIN admissions adm ON adm.admission_number = 'ADM-10001'
-WHERE p.patient_number = 'PAT-10001'
-ON CONFLICT (invoice_number) DO NOTHING;
+-- ------------------------------------------------------------------------------
+-- 35. STAFF ATTENDANCE TABLE (DAILY ATTENDANCE & SHIFT CHECK-IN / CHECK-OUT)
+-- Tracks daily attendance status, check-in/out times, worked hours, and overtime.
+-- ------------------------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS staff_attendance (
+    id BIGSERIAL PRIMARY KEY,
+    employee_id BIGINT NOT NULL REFERENCES staff_employees(id) ON DELETE CASCADE,
+    attendance_date DATE NOT NULL DEFAULT CURRENT_DATE,
+    check_in_time TIME,
+    check_out_time TIME,
+    shift_type VARCHAR(30) NOT NULL DEFAULT 'REGULAR_DAY' CHECK (
+        shift_type IN ('MORNING', 'EVENING', 'NIGHT', 'ROTATIONAL', 'REGULAR_DAY')
+    ),
+    status VARCHAR(30) NOT NULL DEFAULT 'PRESENT' CHECK (
+        status IN ('PRESENT', 'LATE', 'HALF_DAY', 'ABSENT', 'ON_LEAVE', 'HOLIDAY')
+    ),
+    working_hours NUMERIC(5, 2) DEFAULT 0.00,
+    overtime_hours NUMERIC(5, 2) DEFAULT 0.00,
+    remarks TEXT,
+    recorded_by BIGINT REFERENCES users(id) ON DELETE SET NULL,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    CONSTRAINT uq_staff_employee_attendance_date UNIQUE (employee_id, attendance_date)
+);
 
--- 1. Consultation Charge Item
-INSERT INTO billing_invoice_items (
-    invoice_id, charge_type, reference_type, reference_id, reference_code,
-    description, service_date, quantity, unit_price, discount_amount, subtotal
-)
-SELECT
-    inv.id,
-    'CONSULTATION',
-    'APPOINTMENT',
-    a.id,
-    'APT-10001',
-    'Specialist Cardiology Consultation - Dr. Kumara Perera',
-    CURRENT_DATE,
-    1,
-    3500.00,
-    0.00,
-    3500.00
-FROM billing_invoices inv
-LEFT JOIN appointments a ON a.appointment_number = 'APT-10001'
-WHERE inv.invoice_number = 'INV-10001'
-ON CONFLICT DO NOTHING;
+-- ------------------------------------------------------------------------------
+-- 36. STAFF DEPARTMENT ASSIGNMENTS TABLE (DEPARTMENT TRANSFERS & ROLE HISTORY)
+-- Tracks initial department placements, inter-departmental transfers, promotions,
+-- and shift reassignments with effective dates and authorization audit.
+-- ------------------------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS staff_department_assignments (
+    id BIGSERIAL PRIMARY KEY,
+    employee_id BIGINT NOT NULL REFERENCES staff_employees(id) ON DELETE CASCADE,
+    from_department_id BIGINT REFERENCES departments(id) ON DELETE SET NULL,
+    to_department_id BIGINT NOT NULL REFERENCES departments(id) ON DELETE RESTRICT,
+    previous_designation VARCHAR(100),
+    new_designation VARCHAR(100) NOT NULL,
+    previous_shift VARCHAR(30),
+    new_shift VARCHAR(30) NOT NULL,
+    assignment_type VARCHAR(30) NOT NULL DEFAULT 'TRANSFER' CHECK (
+        assignment_type IN ('INITIAL_ASSIGNMENT', 'TRANSFER', 'PROMOTION', 'TEMPORARY_ROTATION', 'REASSIGNMENT')
+    ),
+    effective_date DATE NOT NULL DEFAULT CURRENT_DATE,
+    reason TEXT,
+    assigned_by BIGINT REFERENCES users(id) ON DELETE SET NULL,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
 
--- 2. Laboratory Charge Items (CBC + Lipid Profile)
-INSERT INTO billing_invoice_items (
-    invoice_id, charge_type, reference_type, reference_id, reference_code,
-    description, service_date, quantity, unit_price, discount_amount, subtotal
-)
-SELECT
-    inv.id,
-    'LABORATORY',
-    'LAB_REQUEST',
-    lr.id,
-    'LRQ-10001',
-    'Laboratory Diagnostics: Complete Blood Count (CBC) & Lipid Profile',
-    CURRENT_DATE - INTERVAL '1 day',
-    1,
-    3700.00,
-    0.00,
-    3700.00
-FROM billing_invoices inv
-LEFT JOIN lab_requests lr ON lr.request_number = 'LRQ-10001'
-WHERE inv.invoice_number = 'INV-10001'
-ON CONFLICT DO NOTHING;
+-- ------------------------------------------------------------------------------
+-- 37. STAFF LEAVE RECORDS TABLE (LEAVE REQUESTS, APPROVALS & QUOTA TRACKING)
+-- Manages employee leave applications, handover notes, and supervisor approvals.
+-- ------------------------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS staff_leave_records (
+    id BIGSERIAL PRIMARY KEY,
+    leave_number VARCHAR(30) NOT NULL UNIQUE,
+    employee_id BIGINT NOT NULL REFERENCES staff_employees(id) ON DELETE CASCADE,
+    leave_type VARCHAR(30) NOT NULL CHECK (
+        leave_type IN ('ANNUAL', 'CASUAL', 'SICK', 'MATERNITY', 'PATERNITY', 'UNPAID', 'STUDY', 'EMERGENCY')
+    ),
+    start_date DATE NOT NULL,
+    end_date DATE NOT NULL,
+    total_days INT NOT NULL CHECK (total_days > 0),
+    reason TEXT NOT NULL,
+    handover_notes TEXT,
+    emergency_contact VARCHAR(50),
+    status VARCHAR(30) NOT NULL DEFAULT 'PENDING' CHECK (
+        status IN ('PENDING', 'APPROVED', 'REJECTED', 'CANCELLED')
+    ),
+    reviewed_by BIGINT REFERENCES users(id) ON DELETE SET NULL,
+    reviewed_at TIMESTAMPTZ,
+    review_comments TEXT,
+    requested_by BIGINT REFERENCES users(id) ON DELETE SET NULL,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
 
--- 3. Pharmacy Charge Item (Dispensation DSP-10001)
-INSERT INTO billing_invoice_items (
-    invoice_id, charge_type, reference_type, reference_id, reference_code,
-    description, service_date, quantity, unit_price, discount_amount, subtotal
-)
-SELECT
-    inv.id,
-    'PHARMACY',
-    'PHARMACY_DISPENSATION',
-    dsp.id,
-    'DSP-10001',
-    'Pharmacy Medication Dispensation (Amlodipine 5mg x30, Aspirin 75mg x30)',
-    CURRENT_DATE,
-    1,
-    840.00,
-    0.00,
-    840.00
-FROM billing_invoices inv
-LEFT JOIN pharmacy_dispensations dsp ON dsp.dispensation_number = 'DSP-10001'
-WHERE inv.invoice_number = 'INV-10001'
-ON CONFLICT DO NOTHING;
+-- ------------------------------------------------------------------------------
+-- INDEXES & TRIGGERS FOR MODULE 3.9 (STAFF MANAGEMENT)
+-- ------------------------------------------------------------------------------
+CREATE INDEX IF NOT EXISTS idx_staff_employees_number ON staff_employees(employee_number);
+CREATE INDEX IF NOT EXISTS idx_staff_employees_dept ON staff_employees(department_id);
+CREATE INDEX IF NOT EXISTS idx_staff_employees_role ON staff_employees(role_category);
+CREATE INDEX IF NOT EXISTS idx_staff_employees_status ON staff_employees(status);
+CREATE INDEX IF NOT EXISTS idx_staff_employees_nic ON staff_employees(nic_or_passport);
 
--- 4. Admission Charge Item (2 Days Semi-Private Ward + Nursing Care)
-INSERT INTO billing_invoice_items (
-    invoice_id, charge_type, reference_type, reference_id, reference_code,
-    description, service_date, quantity, unit_price, discount_amount, subtotal
-)
-SELECT
-    inv.id,
-    'ADMISSION',
-    'ADMISSION',
-    adm.id,
-    'ADM-10001',
-    'Inpatient Admission: Cardiology Observation Ward (Bed C-104B) - Room & Nursing (2 Days)',
-    CURRENT_DATE,
-    2,
-    8000.00,
-    0.00,
-    16000.00
-FROM billing_invoices inv
-LEFT JOIN admissions adm ON adm.admission_number = 'ADM-10001'
-WHERE inv.invoice_number = 'INV-10001'
-ON CONFLICT DO NOTHING;
+CREATE INDEX IF NOT EXISTS idx_staff_attendance_emp ON staff_attendance(employee_id);
+CREATE INDEX IF NOT EXISTS idx_staff_attendance_date ON staff_attendance(attendance_date);
+CREATE INDEX IF NOT EXISTS idx_staff_attendance_status ON staff_attendance(status);
 
--- Seed Initial Payment Record (PAY-10001)
-INSERT INTO billing_payments (
-    payment_number, invoice_id, patient_id, payment_date, amount,
-    payment_method, transaction_reference, payer_name, status, notes
-)
-SELECT
-    'PAY-10001',
-    inv.id,
-    inv.patient_id,
-    CURRENT_TIMESTAMP - INTERVAL '2 hours',
-    15000.00,
-    'CARD',
-    'TXN-VISA-884920',
-    'John Doe',
-    'COMPLETED',
-    'Initial advance settlement via Visa credit card at discharge desk.'
-FROM billing_invoices inv
-WHERE inv.invoice_number = 'INV-10001'
-ON CONFLICT (payment_number) DO NOTHING;
+CREATE INDEX IF NOT EXISTS idx_staff_dept_assign_emp ON staff_department_assignments(employee_id);
+CREATE INDEX IF NOT EXISTS idx_staff_dept_assign_to_dept ON staff_department_assignments(to_department_id);
+CREATE INDEX IF NOT EXISTS idx_staff_dept_assign_date ON staff_department_assignments(effective_date);
+
+CREATE INDEX IF NOT EXISTS idx_staff_leave_number ON staff_leave_records(leave_number);
+CREATE INDEX IF NOT EXISTS idx_staff_leave_emp ON staff_leave_records(employee_id);
+CREATE INDEX IF NOT EXISTS idx_staff_leave_status ON staff_leave_records(status);
+CREATE INDEX IF NOT EXISTS idx_staff_leave_dates ON staff_leave_records(start_date, end_date);
+
+DROP TRIGGER IF EXISTS trg_update_staff_employees_timestamp ON staff_employees;
+CREATE TRIGGER trg_update_staff_employees_timestamp
+BEFORE UPDATE ON staff_employees
+FOR EACH ROW
+EXECUTE FUNCTION update_timestamp_column();
+
+DROP TRIGGER IF EXISTS trg_update_staff_attendance_timestamp ON staff_attendance;
+CREATE TRIGGER trg_update_staff_attendance_timestamp
+BEFORE UPDATE ON staff_attendance
+FOR EACH ROW
+EXECUTE FUNCTION update_timestamp_column();
+
+DROP TRIGGER IF EXISTS trg_update_staff_leave_records_timestamp ON staff_leave_records;
+CREATE TRIGGER trg_update_staff_leave_records_timestamp
+BEFORE UPDATE ON staff_leave_records
+FOR EACH ROW
+EXECUTE FUNCTION update_timestamp_column();
+
+
+-- ==============================================================================
+-- Module 3.10 - Hospital Reports & Analytics
+-- (Patient, Appointment, Revenue, Pharmacy, Laboratory & Staff Reports)
+-- ==============================================================================
+
+-- ------------------------------------------------------------------------------
+-- 38. HOSPITAL REPORTS TABLE (GENERATED & SAVED ANALYTICAL REPORTS REGISTRY)
+-- Stores generated analytical report snapshots across all 6 Module 3.10 pillars:
+-- Patient, Appointment, Revenue, Pharmacy, Laboratory, and Staff Reports.
+-- ------------------------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS hospital_reports (
+    id BIGSERIAL PRIMARY KEY,
+    report_number VARCHAR(30) NOT NULL UNIQUE,
+    report_title VARCHAR(200) NOT NULL,
+    report_category VARCHAR(40) NOT NULL CHECK (
+        report_category IN (
+            'PATIENT_REPORT',
+            'APPOINTMENT_REPORT',
+            'REVENUE_REPORT',
+            'PHARMACY_REPORT',
+            'LABORATORY_REPORT',
+            'STAFF_REPORT'
+        )
+    ),
+    period_start DATE,
+    period_end DATE,
+    department_name VARCHAR(100) DEFAULT 'All Hospital Departments',
+    total_records_analyzed BIGINT NOT NULL DEFAULT 0,
+    primary_metric_label VARCHAR(100),
+    primary_metric_value VARCHAR(100),
+    executive_summary TEXT NOT NULL,
+    key_findings TEXT,
+    recommendations TEXT,
+    report_payload_json TEXT,
+    status VARCHAR(30) NOT NULL DEFAULT 'FINALIZED' CHECK (
+        status IN ('DRAFT', 'FINALIZED', 'ARCHIVED')
+    ),
+    generated_by BIGINT REFERENCES users(id) ON DELETE SET NULL,
+    generated_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+
+-- ------------------------------------------------------------------------------
+-- INDEXES & TRIGGERS FOR MODULE 3.10 (HOSPITAL REPORTS)
+-- ------------------------------------------------------------------------------
+CREATE INDEX IF NOT EXISTS idx_hospital_reports_number ON hospital_reports(report_number);
+CREATE INDEX IF NOT EXISTS idx_hospital_reports_category ON hospital_reports(report_category);
+CREATE INDEX IF NOT EXISTS idx_hospital_reports_status ON hospital_reports(status);
+CREATE INDEX IF NOT EXISTS idx_hospital_reports_generated_at ON hospital_reports(generated_at);
+
+DROP TRIGGER IF EXISTS trg_update_hospital_reports_timestamp ON hospital_reports;
+CREATE TRIGGER trg_update_hospital_reports_timestamp
+BEFORE UPDATE ON hospital_reports
+FOR EACH ROW
+EXECUTE FUNCTION update_timestamp_column();
