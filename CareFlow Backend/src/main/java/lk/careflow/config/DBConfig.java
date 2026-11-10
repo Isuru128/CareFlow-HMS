@@ -37,6 +37,7 @@ public class DBConfig {
                 logger.info(banner);
                 ensureBillingTablesExist(connection);
                 ensureStaffTablesExist(connection);
+                ensureReportsTablesExist(connection);
             } catch (Exception e) {
                 logger.error("Failed to connect to PostgreSQL (Supabase) Database: {}", e.getMessage(), e);
             }
@@ -570,6 +571,143 @@ public class DBConfig {
             logger.info("Module 3.9 Staff Management database schema verified.");
         } catch (Exception e) {
             logger.warn("Could not auto-verify Module 3.9 Staff Management schema: {}", e.getMessage());
+        }
+    }
+
+    private void ensureReportsTablesExist(Connection connection) {
+        try (Statement stmt = connection.createStatement()) {
+            stmt.execute("""
+                CREATE TABLE IF NOT EXISTS hospital_reports (
+                    id BIGSERIAL PRIMARY KEY,
+                    report_number VARCHAR(30) NOT NULL UNIQUE,
+                    report_title VARCHAR(200) NOT NULL,
+                    report_category VARCHAR(40) NOT NULL CHECK (
+                        report_category IN ('PATIENT_REPORT', 'APPOINTMENT_REPORT', 'REVENUE_REPORT', 'PHARMACY_REPORT', 'LABORATORY_REPORT', 'STAFF_REPORT')
+                    ),
+                    period_start DATE,
+                    period_end DATE,
+                    department_name VARCHAR(100) DEFAULT 'All Hospital Departments',
+                    total_records_analyzed BIGINT NOT NULL DEFAULT 0,
+                    primary_metric_label VARCHAR(100),
+                    primary_metric_value VARCHAR(100),
+                    executive_summary TEXT NOT NULL,
+                    key_findings TEXT,
+                    recommendations TEXT,
+                    report_payload_json TEXT,
+                    status VARCHAR(30) NOT NULL DEFAULT 'FINALIZED' CHECK (
+                        status IN ('DRAFT', 'FINALIZED', 'ARCHIVED')
+                    ),
+                    generated_by BIGINT REFERENCES users(id) ON DELETE SET NULL,
+                    generated_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                    updated_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP
+                );
+                """);
+
+            try (ResultSet rs = stmt.executeQuery("SELECT COUNT(*) FROM hospital_reports WHERE report_number = 'RPT-10001'")) {
+                if (rs.next() && rs.getLong(1) == 0) {
+                    stmt.execute("""
+                        INSERT INTO hospital_reports (
+                            report_number, report_title, report_category, period_start, period_end,
+                            department_name, total_records_analyzed, primary_metric_label, primary_metric_value,
+                            executive_summary, key_findings, recommendations, status
+                        ) VALUES
+                        (
+                            'RPT-10001',
+                            'Monthly Patient Demographics, Admissions & Registration Analytics',
+                            'PATIENT_REPORT',
+                            CURRENT_DATE - INTERVAL '30 days',
+                            CURRENT_DATE,
+                            'All Hospital Departments',
+                            12,
+                            'Active Registered Patients',
+                            '100% Active Cohort',
+                            'Comprehensive evaluation of outpatient registrations, inpatient ward admissions, blood group distribution, and demographic profiles across CareFlow HMS.',
+                            '1. 100% of registered patients have verified emergency contact and blood group records.\\n2. Cardiology Observation Ward recorded 2-day average length of stay.\\n3. Zero patient readmissions within 30 days of discharge.',
+                            'Continue mandatory allergy and blood group verification at outpatient registration desk.',
+                            'FINALIZED'
+                        ),
+                        (
+                            'RPT-10002',
+                            'Outpatient Clinic Appointment Volume & Specialist Utilization Report',
+                            'APPOINTMENT_REPORT',
+                            CURRENT_DATE - INTERVAL '30 days',
+                            CURRENT_DATE,
+                            'Cardiology & General Medicine',
+                            15,
+                            'Appointment Fulfillment Rate',
+                            '92.5% Completed / Active',
+                            'Analysis of scheduled consultations, queue turnaround times, specialist booking density, and cancellation/no-show ratios across clinical departments.',
+                            '1. Cardiology and General Medicine lead outpatient consultation bookings.\\n2. Morning clinic slots (09:00 - 12:00) demonstrate highest patient attendance.\\n3. Low cancellation rate across confirmed appointments.',
+                            'Expand morning consultation capacity for Cardiology and Pediatrics on peak weekdays.',
+                            'FINALIZED'
+                        ),
+                        (
+                            'RPT-10003',
+                            'Hospital Financial Revenue, Collections & Charge Category Breakdown',
+                            'REVENUE_REPORT',
+                            CURRENT_DATE - INTERVAL '30 days',
+                            CURRENT_DATE,
+                            'Finance & Billing Division',
+                            25,
+                            'Gross Billed Revenue',
+                            'LKR 23,000.00+',
+                            'Consolidated financial audit covering Consultation fees, Laboratory diagnostic charges, Pharmacy medication sales, and Inpatient Admission room/nursing tariffs.',
+                            '1. Inpatient Admission charges and Specialist Consultations represent top revenue drivers.\\n2. Card and Cash settlements account for primary collection channels.\\n3. Partial payments tracked with automated balance due aging.',
+                            'Follow up on partially paid discharge invoices within 7-day credit window.',
+                            'FINALIZED'
+                        ),
+                        (
+                            'RPT-10004',
+                            'Pharmacy Formulary Valuation, FEFO Batch Expiry & Dispensing Report',
+                            'PHARMACY_REPORT',
+                            CURRENT_DATE - INTERVAL '30 days',
+                            CURRENT_DATE,
+                            'Hospital Pharmacy',
+                            21,
+                            'Formulary Availability',
+                            '11 Active Drug Lines',
+                            'Inventory audit of active medicine batches, FEFO expiry risk monitoring, low-stock reorder alerts, and prescription vs OTC dispensing revenue.',
+                            '1. Salbutamol Inhaler 100mcg flagged below reorder threshold (8 units remaining).\\n2. Amoxicillin batch BAT-2025-AMX01 prioritized under FEFO (<30 days to expiry).\\n3. Expired Cetirizine lot isolated for bio-safe disposal.',
+                            'Issue immediate replenishment purchase order for Salbutamol Inhalers and complete FEFO rotation.',
+                            'FINALIZED'
+                        ),
+                        (
+                            'RPT-10005',
+                            'Diagnostic Laboratory Turnaround Time & Abnormal Result Flag Report',
+                            'LABORATORY_REPORT',
+                            CURRENT_DATE - INTERVAL '30 days',
+                            CURRENT_DATE,
+                            'Central Diagnostic Laboratory',
+                            18,
+                            'Diagnostic Completion Rate',
+                            '100% Verified Reports',
+                            'Clinical pathology performance review covering Hematology, Biochemistry, Immunology, and Microbiology test volume, sample collection barcoding, and critical/high flag rates.',
+                            '1. Complete Blood Count (CBC) and Lipid Profile are top requested diagnostic panels.\\n2. 33% of lipid parameters flagged HIGH (Total Cholesterol & Triglycerides), enabling early cardiac intervention.\\n3. All STAT and Urgent requests met target turnaround time.',
+                            'Maintain automated HIGH/CRITICAL result flagging integration with physician EMR dashboard.',
+                            'FINALIZED'
+                        ),
+                        (
+                            'RPT-10006',
+                            'Human Resources Staffing, Shift Attendance & Leave Utilization Report',
+                            'STAFF_REPORT',
+                            CURRENT_DATE - INTERVAL '30 days',
+                            CURRENT_DATE,
+                            'Human Resources & Administration',
+                            17,
+                            'Daily Shift Attendance Rate',
+                            '80.0% Active On-Duty',
+                            'Workforce analytics covering nursing, laboratory, pharmacy, reception, and accounting staff distribution, daily shift check-ins, overtime hours, and leave balances.',
+                            '1. 5 core clinical and administrative staff distributed across Cardiology, General Medicine, Pediatrics, and Orthopedics.\\n2. Morning and Regular Day shifts maintain 100% ward coverage.\\n3. All annual and casual leave requests remain within statutory entitlements.',
+                            'Cross-train outpatient receptionists for inpatient admissions desk coverage during annual leave periods.',
+                            'FINALIZED'
+                        )
+                        ON CONFLICT (report_number) DO NOTHING;
+                        """);
+                }
+            }
+            logger.info("Module 3.10 Hospital Reports & Analytics database schema verified.");
+        } catch (Exception e) {
+            logger.warn("Could not auto-verify Module 3.10 Hospital Reports schema: {}", e.getMessage());
         }
     }
 }
