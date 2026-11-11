@@ -20,27 +20,45 @@ public class DBConfig {
     @Bean
     public CommandLineRunner databaseConnectionCheck(DataSource dataSource) {
         return args -> {
-            try (Connection connection = dataSource.getConnection()) {
-                DatabaseMetaData metaData = connection.getMetaData();
-                String databaseName = metaData.getDatabaseProductName();
-                String databaseVersion = metaData.getDatabaseProductVersion();
+            Thread dbInitThread = new Thread(() -> {
+                int maxAttempts = 3;
+                for (int attempt = 1; attempt <= maxAttempts; attempt++) {
+                    try (Connection connection = dataSource.getConnection()) {
+                        DatabaseMetaData metaData = connection.getMetaData();
+                        String databaseName = metaData.getDatabaseProductName();
+                        String databaseVersion = metaData.getDatabaseProductVersion();
 
-                String banner = """
-                        
-                        ==================================================================
-                         PostgreSQL (Supabase) Database Connected Successfully!
-                         Database: %s
-                         Version : %s
-                        ==================================================================
-                        """.formatted(databaseName, databaseVersion);
+                        String banner = """
+                                
+                                ==================================================================
+                                 PostgreSQL (Supabase) Database Connected Successfully!
+                                 Database: %s
+                                 Version : %s
+                                ==================================================================
+                                """.formatted(databaseName, databaseVersion);
 
-                logger.info(banner);
-                ensureBillingTablesExist(connection);
-                ensureStaffTablesExist(connection);
-                ensureReportsTablesExist(connection);
-            } catch (Exception e) {
-                logger.error("Failed to connect to PostgreSQL (Supabase) Database: {}", e.getMessage(), e);
-            }
+                        logger.info(banner);
+                        ensureBillingTablesExist(connection);
+                        ensureStaffTablesExist(connection);
+                        ensureReportsTablesExist(connection);
+                        return;
+                    } catch (Exception e) {
+                        logger.warn("Database connection check attempt {}/{} failed: {}", attempt, maxAttempts, e.getMessage());
+                        if (attempt < maxAttempts) {
+                            try {
+                                Thread.sleep(3000L * attempt);
+                            } catch (InterruptedException ie) {
+                                Thread.currentThread().interrupt();
+                                return;
+                            }
+                        } else {
+                            logger.error("Failed to connect to PostgreSQL (Supabase) Database after {} attempts: {}", maxAttempts, e.getMessage());
+                        }
+                    }
+                }
+            }, "careflow-db-init");
+            dbInitThread.setDaemon(true);
+            dbInitThread.start();
         };
     }
 
