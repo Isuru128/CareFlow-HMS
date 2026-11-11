@@ -50,10 +50,9 @@ WORKDIR /app
 RUN addgroup -S -g 1001 appgroup && \
     adduser -S -u 1001 -G appgroup appuser
 
-# Pre-create writable directories required by FileStorageService (@PostConstruct)
-# and multipart uploads so non-root 'appuser' never hits AccessDeniedException on Render
-RUN mkdir -p /app/uploads/patient-documents /tmp/careflow && \
-    chown -R appuser:appgroup /app /tmp/careflow
+# Pre-create writable directories inside /app (never inside /tmp during build, as Render mounts fresh tmpfs on /tmp)
+RUN mkdir -p /app/uploads/patient-documents /app/tmp && \
+    chown -R appuser:appgroup /app
 
 # Copy compiled executable JAR from builder stage with non-root ownership
 COPY --from=builder --chown=appuser:appgroup /build/target/app.jar /app/app.jar
@@ -74,5 +73,5 @@ EXPOSE ${PORT}
 HEALTHCHECK --interval=30s --timeout=5s --start-period=60s --retries=3 \
     CMD curl -fsS http://127.0.0.1:${PORT:-8080}/api/public/health || exit 1
 
-# Launch Spring Boot binding dynamically to Render's $PORT environment variable
-ENTRYPOINT ["sh", "-c", "exec java $JAVA_OPTS -Djava.io.tmpdir=/tmp/careflow -Dserver.port=${PORT:-8080} -jar /app/app.jar"]
+# Ensure writable temp and upload dirs exist at runtime and launch Spring Boot on Render's $PORT
+ENTRYPOINT ["sh", "-c", "mkdir -p /app/uploads/patient-documents /app/tmp && exec java $JAVA_OPTS -Djava.io.tmpdir=/app/tmp -Dserver.port=${PORT:-8080} -jar /app/app.jar"]
