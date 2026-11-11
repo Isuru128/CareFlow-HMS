@@ -61,10 +61,11 @@ COPY --from=builder --chown=appuser:appgroup /build/target/app.jar /app/app.jar
 USER appuser
 
 # Environment defaults (Render automatically injects PORT, DB_URL, DB_USERNAME, DB_PASSWORD, JWT_SECRET)
+# Memory-tuned for Render 512 MiB RAM / 0.1 vCPU container and TLSv1.2 for Supabase pooler compatibility
 ENV TZ=Asia/Colombo \
     PORT=8080 \
     UPLOAD_DIR=/app/uploads/patient-documents \
-    JAVA_OPTS="-XX:+UseContainerSupport -XX:MaxRAMPercentage=75.0 -XX:InitialRAMPercentage=50.0 -XX:+UseG1GC -XX:+ExitOnOutOfMemoryError -Djava.security.egd=file:/dev/./urandom -Dfile.encoding=UTF-8"
+    JAVA_OPTS="-Xms96m -Xmx220m -XX:MaxMetaspaceSize=110m -XX:CompressedClassSpaceSize=24m -XX:ReservedCodeCacheSize=48m -Xss512k -XX:+UseSerialGC -XX:TieredStopAtLevel=1 -XX:+ExitOnOutOfMemoryError -Djdk.tls.client.protocols=TLSv1.2 -Djava.security.egd=file:/dev/./urandom -Dfile.encoding=UTF-8"
 
 # Expose application port (Render dynamically maps PORT at runtime)
 EXPOSE ${PORT}
