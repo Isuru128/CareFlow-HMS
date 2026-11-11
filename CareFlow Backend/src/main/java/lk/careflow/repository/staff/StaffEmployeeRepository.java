@@ -25,7 +25,8 @@ public interface StaffEmployeeRepository extends JpaRepository<StaffEmployee, Lo
 
     boolean existsByEmailIgnoreCase(String email);
 
-    boolean existsByNicOrPassportIgnoreCase(String nicOrPassport);
+    @Query("SELECT COUNT(e) > 0 FROM StaffEmployee e WHERE LOWER(e.nicOrPassport) = LOWER(:nicOrPassport)")
+    boolean existsByNicOrPassportIgnoreCase(@Param("nicOrPassport") String nicOrPassport);
 
     long countByStatus(StaffStatus status);
 
