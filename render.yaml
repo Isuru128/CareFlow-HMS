@@ -15,6 +15,8 @@ services:
         value: Asia/Colombo
       - key: UPLOAD_DIR
         value: /app/uploads/patient-documents
+      - key: JAVA_OPTS
+        value: "-Xms96m -Xmx220m -XX:MaxMetaspaceSize=110m -XX:CompressedClassSpaceSize=24m -XX:ReservedCodeCacheSize=48m -Xss512k -XX:+UseSerialGC -XX:TieredStopAtLevel=1 -XX:+ExitOnOutOfMemoryError -Djdk.tls.client.protocols=TLSv1.2 -Djava.security.egd=file:/dev/./urandom -Dfile.encoding=UTF-8"
       - key: JWT_EXPIRATION_MS
         value: 86400000
       - key: JWT_REFRESH_EXPIRATION_MS
