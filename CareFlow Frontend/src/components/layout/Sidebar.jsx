@@ -131,33 +131,6 @@ export default function Sidebar() {
           <span>My Profile</span>
         </NavLink>
       </nav>
-
-      <div className="sidebar-footer">
-        <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
-          <div style={{
-            width: '32px',
-            height: '32px',
-            borderRadius: '50%',
-            background: 'var(--primary)',
-            color: '#ffffff',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            fontWeight: 700,
-            fontSize: '0.8rem'
-          }}>
-            {user?.firstName?.[0] || 'U'}
-          </div>
-          <div style={{ overflow: 'hidden' }}>
-            <div style={{ fontSize: '0.8rem', fontWeight: 600, color: '#ffffff', textOverflow: 'ellipsis', overflow: 'hidden', whiteSpace: 'nowrap' }}>
-              {user?.firstName} {user?.lastName}
-            </div>
-            <div style={{ fontSize: '0.7rem', color: '#94a3b8' }}>
-              {user?.roles?.[0]?.replace('ROLE_', '') || 'STAFF'}
-            </div>
-          </div>
-        </div>
-      </div>
     </aside>
   )
 }
