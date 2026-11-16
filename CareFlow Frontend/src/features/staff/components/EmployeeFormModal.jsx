@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react'
 import { staffApi } from '../api/staffApi'
+import { validateEmployeeForm, normalizePhoneTo10Digits } from '../../../utils/validation'
 import { X, UserPlus, Save, AlertCircle } from 'lucide-react'
 
 export default function EmployeeFormModal({
@@ -108,8 +109,9 @@ export default function EmployeeFormModal({
 
   const handleSubmit = async (e) => {
     e.preventDefault()
-    if (!formData.departmentId) {
-      setError('Please select a hospital department.')
+    const validationError = validateEmployeeForm(formData)
+    if (validationError) {
+      setError(validationError)
       return
     }
     try {
@@ -117,6 +119,15 @@ export default function EmployeeFormModal({
       setError(null)
       const payload = {
         ...formData,
+        firstName: formData.firstName.trim(),
+        lastName: formData.lastName.trim(),
+        nicOrPassport: formData.nicOrPassport.trim(),
+        contactNumber: normalizePhoneTo10Digits(formData.contactNumber),
+        emergencyContactNumber: formData.emergencyContactNumber?.trim()
+          ? normalizePhoneTo10Digits(formData.emergencyContactNumber)
+          : '',
+        email: formData.email.trim(),
+        designation: formData.designation.trim(),
         departmentId: Number(formData.departmentId),
         basicSalary: Number(formData.basicSalary) || 0,
         annualLeaveQuota: Number(formData.annualLeaveQuota) || 14,

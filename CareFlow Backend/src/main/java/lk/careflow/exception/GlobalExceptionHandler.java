@@ -124,11 +124,15 @@ public class GlobalExceptionHandler {
             fieldErrors.put(error.getField(), error.getDefaultMessage());
         }
 
+        String combinedMessage = fieldErrors.isEmpty()
+                ? "Input validation failed for one or more fields"
+                : String.join("; ", fieldErrors.values());
+
         ErrorResponse errorResponse = ErrorResponse.builder()
                 .timestamp(Instant.now())
                 .status(HttpStatus.BAD_REQUEST.value())
                 .error("Validation Failed")
-                .message("Input validation failed for one or more fields")
+                .message(combinedMessage)
                 .path(request.getRequestURI())
                 .validationErrors(fieldErrors)
                 .build();

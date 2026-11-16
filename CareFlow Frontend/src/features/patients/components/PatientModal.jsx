@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react'
 import { patientApi } from '../api/patientApi'
+import { validatePatientForm, normalizePhoneTo10Digits } from '../../../utils/validation'
 import { X, Loader2, AlertCircle, User, Phone, ShieldAlert, HeartPulse } from 'lucide-react'
 
 const BLOOD_GROUPS = ['A+', 'A-', 'B+', 'B-', 'AB+', 'AB-', 'O+', 'O-']
@@ -90,17 +91,9 @@ export default function PatientModal({ isOpen, onClose, onPatientSaved, patientT
     e.preventDefault()
     setError('')
 
-    // Client-side quick checks
-    if (!formData.firstName.trim() || !formData.lastName.trim()) {
-      setError('First name and last name are required.')
-      return
-    }
-    if (!formData.dateOfBirth) {
-      setError('Date of birth is required.')
-      return
-    }
-    if (!formData.contactNumber.trim()) {
-      setError('Contact number is required.')
+    const validationError = validatePatientForm(formData)
+    if (validationError) {
+      setError(validationError)
       return
     }
 
@@ -111,7 +104,10 @@ export default function PatientModal({ isOpen, onClose, onPatientSaved, patientT
         ...formData,
         firstName: formData.firstName.trim(),
         lastName: formData.lastName.trim(),
-        contactNumber: formData.contactNumber.trim(),
+        contactNumber: normalizePhoneTo10Digits(formData.contactNumber),
+        emergencyContactNumber: formData.emergencyContactNumber?.trim()
+          ? normalizePhoneTo10Digits(formData.emergencyContactNumber)
+          : null,
         email: formData.email.trim() || null,
         nicOrPassport: formData.nicOrPassport.trim() || null,
         bloodGroup: formData.bloodGroup || null,
@@ -318,13 +314,14 @@ export default function PatientModal({ isOpen, onClose, onPatientSaved, patientT
 
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '1rem' }}>
                 <div className="form-group">
-                  <label className="form-label">Contact / Mobile Number *</label>
+                  <label className="form-label">Contact / Mobile Number (10 digits) *</label>
                   <input
                     type="tel"
                     name="contactNumber"
                     required
+                    maxLength={12}
                     className="form-input"
-                    placeholder="+94 77 123 4567"
+                    placeholder="e.g. 0771234567"
                     value={formData.contactNumber}
                     onChange={handleChange}
                   />
@@ -336,7 +333,7 @@ export default function PatientModal({ isOpen, onClose, onPatientSaved, patientT
                     type="email"
                     name="email"
                     className="form-input"
-                    placeholder="patient@example.com"
+                    placeholder="e.g. patient@domain.com or patient@careflow.lk"
                     value={formData.email}
                     onChange={handleChange}
                   />
@@ -386,12 +383,13 @@ export default function PatientModal({ isOpen, onClose, onPatientSaved, patientT
                 </div>
 
                 <div className="form-group">
-                  <label className="form-label">Emergency Phone Number</label>
+                  <label className="form-label">Emergency Phone Number (10 digits)</label>
                   <input
                     type="tel"
                     name="emergencyContactNumber"
+                    maxLength={12}
                     className="form-input"
-                    placeholder="+94 77 987 6543"
+                    placeholder="e.g. 0779876543"
                     value={formData.emergencyContactNumber}
                     onChange={handleChange}
                   />

@@ -49,9 +49,11 @@ public class AppointmentService {
             LocalDate startDate,
             LocalDate endDate,
             Pageable pageable) {
-        String cleanQuery = (query != null && !query.trim().isEmpty()) ? query.trim() : null;
+        String cleanQuery = (query != null && !query.trim().isEmpty()) ? query.trim() : "";
+        LocalDate effectiveStart = (startDate != null) ? startDate : LocalDate.of(1900, 1, 1);
+        LocalDate effectiveEnd = (endDate != null) ? endDate : LocalDate.of(2100, 1, 1);
         return appointmentRepository.searchAppointments(
-                cleanQuery, doctorId, patientId, departmentId, status, startDate, endDate, pageable)
+                cleanQuery, doctorId, patientId, departmentId, status, effectiveStart, effectiveEnd, pageable)
                 .map(this::mapToAppointmentResponse);
     }
 

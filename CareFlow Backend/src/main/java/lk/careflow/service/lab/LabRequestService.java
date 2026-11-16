@@ -52,9 +52,11 @@ public class LabRequestService {
             Instant startDate,
             Instant endDate,
             Pageable pageable) {
-        String cleanQuery = (query != null && !query.trim().isEmpty()) ? query.trim() : null;
+        String cleanQuery = (query != null && !query.trim().isEmpty()) ? query.trim() : "";
+        Instant effectiveStart = (startDate != null) ? startDate : Instant.parse("1900-01-01T00:00:00Z");
+        Instant effectiveEnd = (endDate != null) ? endDate : Instant.parse("2100-01-01T00:00:00Z");
         return labRequestRepository.searchRequests(
-                cleanQuery, patientId, doctorId, status, priority, startDate, endDate, pageable)
+                cleanQuery, patientId, doctorId, status, priority, effectiveStart, effectiveEnd, pageable)
                 .map(this::mapToResponse);
     }
 

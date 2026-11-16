@@ -29,9 +29,9 @@ public interface LabRequestRepository extends JpaRepository<LabRequest, Long> {
            "(:doctorId IS NULL OR (d IS NOT NULL AND d.id = :doctorId)) AND " +
            "(:status IS NULL OR lr.status = :status) AND " +
            "(:priority IS NULL OR lr.priority = :priority) AND " +
-           "(:startDate IS NULL OR lr.requestedAt >= :startDate) AND " +
-           "(:endDate IS NULL OR lr.requestedAt <= :endDate) AND " +
-           "(:query IS NULL OR (" +
+           "lr.requestedAt >= :startDate AND " +
+           "lr.requestedAt <= :endDate AND " +
+           "(:query IS NULL OR :query = '' OR (" +
            "LOWER(lr.requestNumber) LIKE LOWER(CONCAT('%', :query, '%')) OR " +
            "LOWER(p.patientNumber) LIKE LOWER(CONCAT('%', :query, '%')) OR " +
            "LOWER(p.firstName) LIKE LOWER(CONCAT('%', :query, '%')) OR " +

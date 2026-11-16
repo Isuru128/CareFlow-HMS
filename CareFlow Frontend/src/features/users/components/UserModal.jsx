@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react'
 import { userApi } from '../api/userApi'
+import { validateUserForm, normalizePhoneTo10Digits } from '../../../utils/validation'
 import { X, Loader2, AlertCircle } from 'lucide-react'
 
 const AVAILABLE_ROLES = [
@@ -73,25 +74,36 @@ export default function UserModal({ isOpen, onClose, onUserSaved, userToEdit }) 
   const handleSubmit = async (e) => {
     e.preventDefault()
     setError('')
+
+    const validationError = validateUserForm(formData, isEditing)
+    if (validationError) {
+      setError(validationError)
+      return
+    }
+
     setLoading(true)
 
     try {
+      const normalizedPhone = formData.phoneNumber?.trim()
+        ? normalizePhoneTo10Digits(formData.phoneNumber)
+        : ''
+
       if (isEditing) {
         await userApi.updateUser(userToEdit.id, {
-          firstName: formData.firstName,
-          lastName: formData.lastName,
-          phoneNumber: formData.phoneNumber,
+          firstName: formData.firstName.trim(),
+          lastName: formData.lastName.trim(),
+          phoneNumber: normalizedPhone,
           status: formData.status,
           roles: formData.roles
         })
       } else {
         await userApi.createUser({
-          username: formData.username,
-          email: formData.email,
+          username: formData.username.trim(),
+          email: formData.email.trim(),
           password: formData.password,
-          firstName: formData.firstName,
-          lastName: formData.lastName,
-          phoneNumber: formData.phoneNumber,
+          firstName: formData.firstName.trim(),
+          lastName: formData.lastName.trim(),
+          phoneNumber: normalizedPhone,
           roles: formData.roles
         })
       }

@@ -1,6 +1,9 @@
 package lk.careflow.dto.staff;
 
+import jakarta.validation.constraints.DecimalMax;
+import jakarta.validation.constraints.DecimalMin;
 import jakarta.validation.constraints.NotNull;
+import jakarta.validation.constraints.Size;
 import lk.careflow.entity.staff.AttendanceStatus;
 import lk.careflow.entity.staff.ShiftType;
 import lombok.*;
@@ -27,8 +30,15 @@ public class RecordAttendanceRequest {
     @NotNull(message = "Attendance status is required")
     private AttendanceStatus status;
 
+    @DecimalMin(value = "0.0", inclusive = true, message = "Working hours cannot be negative")
+    @DecimalMax(value = "24.0", inclusive = true, message = "Working hours cannot exceed 24 hours")
     private BigDecimal workingHours;
+
+    @DecimalMin(value = "0.0", inclusive = true, message = "Overtime hours cannot be negative")
+    @DecimalMax(value = "24.0", inclusive = true, message = "Overtime hours cannot exceed 24 hours")
     private BigDecimal overtimeHours;
+
+    @Size(max = 500, message = "Remarks must not exceed 500 characters")
     private String remarks;
 }
 

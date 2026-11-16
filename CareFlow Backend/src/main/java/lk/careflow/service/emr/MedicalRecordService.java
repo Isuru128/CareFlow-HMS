@@ -54,9 +54,11 @@ public class MedicalRecordService {
             Instant startDate,
             Instant endDate,
             Pageable pageable) {
-        String cleanQuery = (query != null && !query.trim().isEmpty()) ? query.trim() : null;
+        String cleanQuery = (query != null && !query.trim().isEmpty()) ? query.trim() : "";
+        Instant effectiveStart = (startDate != null) ? startDate : Instant.parse("1900-01-01T00:00:00Z");
+        Instant effectiveEnd = (endDate != null) ? endDate : Instant.parse("2100-01-01T00:00:00Z");
         return medicalRecordRepository.searchMedicalRecords(
-                cleanQuery, patientId, doctorId, status, startDate, endDate, pageable)
+                cleanQuery, patientId, doctorId, status, effectiveStart, effectiveEnd, pageable)
                 .map(this::mapToRecordResponse);
     }
 

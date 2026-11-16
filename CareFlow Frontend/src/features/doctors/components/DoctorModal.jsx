@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react'
 import { doctorApi } from '../api/doctorApi'
+import { validateDoctorForm, normalizePhoneTo10Digits } from '../../../utils/validation'
 import { X, Loader2, AlertCircle, Stethoscope, Building, Award, DollarSign } from 'lucide-react'
 
 export default function DoctorModal({ isOpen, onClose, onSuccess, doctor = null }) {
@@ -95,28 +96,9 @@ export default function DoctorModal({ isOpen, onClose, onSuccess, doctor = null 
     e.preventDefault()
     setError('')
 
-    if (!formData.firstName.trim() || !formData.lastName.trim()) {
-      setError('First name and last name are required.')
-      return
-    }
-    if (!formData.specialization.trim()) {
-      setError('Specialization is required.')
-      return
-    }
-    if (!formData.licenseNumber.trim()) {
-      setError('Medical license number is required.')
-      return
-    }
-    if (!formData.departmentId) {
-      setError('Please select a department.')
-      return
-    }
-    if (!formData.qualification.trim()) {
-      setError('Qualification is required.')
-      return
-    }
-    if (!formData.contactNumber.trim()) {
-      setError('Contact number is required.')
+    const validationError = validateDoctorForm(formData)
+    if (validationError) {
+      setError(validationError)
       return
     }
 
@@ -124,6 +106,10 @@ export default function DoctorModal({ isOpen, onClose, onSuccess, doctor = null 
     try {
       const payload = {
         ...formData,
+        firstName: formData.firstName.trim(),
+        lastName: formData.lastName.trim(),
+        contactNumber: normalizePhoneTo10Digits(formData.contactNumber),
+        email: formData.email?.trim() || null,
         departmentId: Number(formData.departmentId),
         consultationFee: Number(formData.consultationFee),
         experienceYears: Number(formData.experienceYears) || 0
