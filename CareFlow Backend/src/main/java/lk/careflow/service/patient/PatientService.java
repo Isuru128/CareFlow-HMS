@@ -42,7 +42,7 @@ public class PatientService {
 
     @Transactional(readOnly = true)
     public Page<PatientResponse> searchPatients(String query, PatientStatus status, Gender gender, Pageable pageable) {
-        String cleanQuery = (query != null && !query.trim().isEmpty()) ? query.trim() : null;
+        String cleanQuery = (query != null && !query.trim().isEmpty()) ? query.trim() : "";
         return patientRepository.searchPatients(cleanQuery, status, gender, pageable)
                 .map(this::mapToPatientResponse);
     }
