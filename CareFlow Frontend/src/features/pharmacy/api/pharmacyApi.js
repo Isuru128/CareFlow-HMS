@@ -10,7 +10,7 @@ export const pharmacyApi = {
   // Medicines (Formulary / Catalog)
   searchMedicines: async ({ query = '', category = '', dosageForm = '', isActive = '', page = 0, size = 15 } = {}) => {
     const params = new URLSearchParams()
-    if (query) params.append('query', query)
+    params.append('query', query ? query.trim() : '')
     if (category && category !== 'ALL') params.append('category', category)
     if (dosageForm && dosageForm !== 'ALL') params.append('dosageForm', dosageForm)
     if (isActive !== '' && isActive !== 'ALL') params.append('isActive', isActive)
@@ -60,7 +60,7 @@ export const pharmacyApi = {
   // Batches & Stock Management
   searchBatches: async ({ query = '', medicineId = '', status = '', page = 0, size = 15 } = {}) => {
     const params = new URLSearchParams()
-    if (query) params.append('query', query)
+    params.append('query', query ? query.trim() : '')
     if (medicineId) params.append('medicineId', medicineId)
     if (status && status !== 'ALL') params.append('status', status)
     params.append('page', page)
@@ -116,7 +116,7 @@ export const pharmacyApi = {
 
   searchStockTransactions: async ({ query = '', medicineId = '', transactionType = '', page = 0, size = 20 } = {}) => {
     const params = new URLSearchParams()
-    if (query) params.append('query', query)
+    params.append('query', query ? query.trim() : '')
     if (medicineId) params.append('medicineId', medicineId)
     if (transactionType && transactionType !== 'ALL') params.append('transactionType', transactionType)
     params.append('page', page)
@@ -130,7 +130,7 @@ export const pharmacyApi = {
   // Dispensations & Prescription Processing
   searchDispensations: async ({ query = '', status = '', paymentStatus = '', page = 0, size = 15 } = {}) => {
     const params = new URLSearchParams()
-    if (query) params.append('query', query)
+    params.append('query', query ? query.trim() : '')
     if (status && status !== 'ALL') params.append('status', status)
     if (paymentStatus && paymentStatus !== 'ALL') params.append('paymentStatus', paymentStatus)
     params.append('page', page)
@@ -153,7 +153,7 @@ export const pharmacyApi = {
 
   getPendingPrescriptions: async ({ query = '', page = 0, size = 15 } = {}) => {
     const params = new URLSearchParams()
-    if (query) params.append('query', query)
+    params.append('query', query ? query.trim() : '')
     params.append('page', page)
     params.append('size', size)
     params.append('sort', 'issueDate,desc')

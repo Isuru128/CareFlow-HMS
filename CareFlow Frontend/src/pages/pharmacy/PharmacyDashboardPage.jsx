@@ -202,8 +202,15 @@ export default function PharmacyDashboardPage() {
   }, [])
 
   useEffect(() => {
+    setStatusFilter('ALL')
+    setCategoryFilter('ALL')
+    setDosageFilter('ALL')
     setPage(0)
-  }, [activeTab, searchQuery, categoryFilter, dosageFilter, statusFilter, lowStockOnly])
+  }, [activeTab])
+
+  useEffect(() => {
+    setPage(0)
+  }, [searchQuery, categoryFilter, dosageFilter, statusFilter, lowStockOnly])
 
   useEffect(() => {
     loadTabData()
