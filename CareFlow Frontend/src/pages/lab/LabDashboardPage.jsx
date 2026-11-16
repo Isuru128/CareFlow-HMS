@@ -158,8 +158,15 @@ export default function LabDashboardPage() {
   }, [])
 
   useEffect(() => {
+    setStatusFilter('ALL')
+    setPriorityFilter('ALL')
+    setCategoryFilter('ALL')
     setPage(0)
-  }, [activeTab, searchQuery, statusFilter, priorityFilter, categoryFilter])
+  }, [activeTab])
+
+  useEffect(() => {
+    setPage(0)
+  }, [searchQuery, statusFilter, priorityFilter, categoryFilter])
 
   useEffect(() => {
     loadTabData()
