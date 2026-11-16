@@ -22,7 +22,7 @@ public interface LabReportRepository extends JpaRepository<LabReport, Long> {
     @Query("SELECT rpt FROM LabReport rpt " +
            "JOIN rpt.request req " +
            "JOIN req.patient p " +
-           "WHERE (:query IS NULL OR (" +
+           "WHERE (:query IS NULL OR :query = '' OR (" +
            "LOWER(rpt.reportNumber) LIKE LOWER(CONCAT('%', :query, '%')) OR " +
            "LOWER(req.requestNumber) LIKE LOWER(CONCAT('%', :query, '%')) OR " +
            "LOWER(p.patientNumber) LIKE LOWER(CONCAT('%', :query, '%')) OR " +

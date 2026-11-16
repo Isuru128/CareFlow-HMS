@@ -19,7 +19,7 @@ public interface PharmacyStockTransactionRepository extends JpaRepository<Pharma
     @Query("SELECT t FROM PharmacyStockTransaction t WHERE " +
            "(:medicineId IS NULL OR t.medicine.id = :medicineId) AND " +
            "(:transactionType IS NULL OR t.transactionType = :transactionType) AND " +
-           "(:query IS NULL OR (" +
+           "(:query IS NULL OR :query = '' OR (" +
            "LOWER(t.referenceNumber) LIKE LOWER(CONCAT('%', :query, '%')) OR " +
            "LOWER(t.medicine.name) LIKE LOWER(CONCAT('%', :query, '%')) OR " +
            "LOWER(t.notes) LIKE LOWER(CONCAT('%', :query, '%'))))")

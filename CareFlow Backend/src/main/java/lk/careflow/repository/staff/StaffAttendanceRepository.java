@@ -32,7 +32,7 @@ public interface StaffAttendanceRepository extends JpaRepository<StaffAttendance
            "JOIN e.department d " +
            "WHERE (:employeeId IS NULL OR e.id = :employeeId) AND " +
            "(:departmentId IS NULL OR d.id = :departmentId) AND " +
-           "(:attendanceDate IS NULL OR a.attendanceDate = :attendanceDate) AND " +
+           "a.attendanceDate = COALESCE(:attendanceDate, a.attendanceDate) AND " +
            "(:status IS NULL OR a.status = :status) AND " +
            "(:shiftType IS NULL OR a.shiftType = :shiftType) AND " +
            "(:query IS NULL OR :query = '' OR (" +

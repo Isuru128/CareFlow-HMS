@@ -18,11 +18,13 @@ public class UpdateDoctorRequest {
     private Long userId;
 
     @NotBlank(message = "First name is required")
-    @Size(max = 50, message = "First name must not exceed 50 characters")
+    @Size(min = 2, max = 50, message = "First name must be between 2 and 50 characters")
+    @Pattern(regexp = "^[A-Za-z .'-]{2,50}$", message = "First name can only contain letters, spaces, dots, hyphens, and apostrophes")
     private String firstName;
 
     @NotBlank(message = "Last name is required")
-    @Size(max = 50, message = "Last name must not exceed 50 characters")
+    @Size(min = 2, max = 50, message = "Last name must be between 2 and 50 characters")
+    @Pattern(regexp = "^[A-Za-z .'-]{2,50}$", message = "Last name can only contain letters, spaces, dots, hyphens, and apostrophes")
     private String lastName;
 
     @NotBlank(message = "Specialization is required")
@@ -31,6 +33,7 @@ public class UpdateDoctorRequest {
 
     @NotBlank(message = "License number is required")
     @Size(max = 50, message = "License number must not exceed 50 characters")
+    @Pattern(regexp = "^[A-Za-z0-9/-]{3,50}$", message = "License number must be 3-50 alphanumeric characters (e.g., SLMC-12345)")
     private String licenseNumber;
 
     @NotNull(message = "Department ID is required")
@@ -41,13 +44,16 @@ public class UpdateDoctorRequest {
     private String qualification;
 
     @Min(value = 0, message = "Experience years must be 0 or greater")
+    @Max(value = 70, message = "Experience years must not exceed 70")
     private Integer experienceYears;
 
     @NotBlank(message = "Contact number is required")
     @Size(max = 20, message = "Contact number must not exceed 20 characters")
+    @Pattern(regexp = "^(\\+94\\d{9}|\\d{10})$", message = "Contact number must be 10 digits (e.g., 0771234567)")
     private String contactNumber;
 
     @Email(message = "Email must be valid")
+    @Pattern(regexp = "^$|^[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\\.[A-Za-z]{2,}$", message = "Email must be a valid format (e.g., doctor@careflow.lk or doctor@domain.com)")
     @Size(max = 100, message = "Email must not exceed 100 characters")
     private String email;
 

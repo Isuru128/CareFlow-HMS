@@ -24,7 +24,7 @@ public interface LabTestRepository extends JpaRepository<LabTest, Long> {
     @Query("SELECT lt FROM LabTest lt WHERE " +
            "(:category IS NULL OR lt.category = :category) AND " +
            "(:isActive IS NULL OR lt.isActive = :isActive) AND " +
-           "(:query IS NULL OR (" +
+           "(:query IS NULL OR :query = '' OR (" +
            "LOWER(lt.testCode) LIKE LOWER(CONCAT('%', :query, '%')) OR " +
            "LOWER(lt.testName) LIKE LOWER(CONCAT('%', :query, '%')) OR " +
            "LOWER(lt.description) LIKE LOWER(CONCAT('%', :query, '%'))))")

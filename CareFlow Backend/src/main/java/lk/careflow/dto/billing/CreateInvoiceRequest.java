@@ -26,8 +26,10 @@ public class CreateInvoiceRequest {
 
     private LocalDate dueDate;
 
+    @DecimalMin(value = "0.0", inclusive = true, message = "Discount amount cannot be negative")
     private BigDecimal discountAmount;
 
+    @DecimalMin(value = "0.0", inclusive = true, message = "Tax amount cannot be negative")
     private BigDecimal taxAmount;
 
     private InvoiceStatus status;
@@ -38,6 +40,7 @@ public class CreateInvoiceRequest {
     @Valid
     private List<InvoiceItemRequest> items;
 
+    @Valid
     private RecordPaymentRequest initialPayment;
 }
 

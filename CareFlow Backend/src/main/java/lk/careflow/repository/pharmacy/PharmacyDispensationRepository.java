@@ -28,7 +28,7 @@ public interface PharmacyDispensationRepository extends JpaRepository<PharmacyDi
     @Query("SELECT d FROM PharmacyDispensation d WHERE " +
            "(:status IS NULL OR d.status = :status) AND " +
            "(:paymentStatus IS NULL OR d.paymentStatus = :paymentStatus) AND " +
-           "(:query IS NULL OR (" +
+           "(:query IS NULL OR :query = '' OR (" +
            "LOWER(d.dispensationNumber) LIKE LOWER(CONCAT('%', :query, '%')) OR " +
            "LOWER(d.patientName) LIKE LOWER(CONCAT('%', :query, '%')) OR " +
            "LOWER(d.doctorName) LIKE LOWER(CONCAT('%', :query, '%'))))")
