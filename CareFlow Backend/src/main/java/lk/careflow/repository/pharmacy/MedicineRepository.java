@@ -28,7 +28,7 @@ public interface MedicineRepository extends JpaRepository<Medicine, Long> {
            "(:category IS NULL OR m.category = :category) AND " +
            "(:dosageForm IS NULL OR m.dosageForm = :dosageForm) AND " +
            "(:isActive IS NULL OR m.isActive = :isActive) AND " +
-           "(:query IS NULL OR (" +
+           "(:query IS NULL OR :query = '' OR (" +
            "LOWER(m.medicineCode) LIKE LOWER(CONCAT('%', :query, '%')) OR " +
            "LOWER(m.name) LIKE LOWER(CONCAT('%', :query, '%')) OR " +
            "LOWER(m.genericName) LIKE LOWER(CONCAT('%', :query, '%')) OR " +
