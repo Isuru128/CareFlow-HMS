@@ -36,7 +36,7 @@ public class LabSampleService {
 
     @Transactional(readOnly = true)
     public Page<LabSampleResponse> searchSamples(String query, SampleStatus status, Pageable pageable) {
-        String cleanQuery = (query != null && !query.trim().isEmpty()) ? query.trim() : null;
+        String cleanQuery = (query != null && !query.trim().isEmpty()) ? query.trim() : "";
         return labSampleRepository.searchSamples(cleanQuery, status, pageable)
                 .map(this::mapToResponse);
     }
