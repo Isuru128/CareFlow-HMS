@@ -48,7 +48,8 @@ public class PharmacyDispensationService {
             DispensationStatus status,
             PaymentStatus paymentStatus,
             Pageable pageable) {
-        return dispensationRepository.searchDispensations(query, status, paymentStatus, pageable)
+        String cleanQuery = (query != null && !query.trim().isEmpty()) ? query.trim() : "";
+        return dispensationRepository.searchDispensations(cleanQuery, status, paymentStatus, pageable)
                 .map(this::mapToDispensationDto);
     }
 
