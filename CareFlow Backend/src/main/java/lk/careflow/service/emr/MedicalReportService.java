@@ -47,7 +47,7 @@ public class MedicalReportService {
             ReportType reportType,
             ReportStatus status,
             Pageable pageable) {
-        String cleanQuery = (query != null && !query.trim().isEmpty()) ? query.trim() : null;
+        String cleanQuery = (query != null && !query.trim().isEmpty()) ? query.trim() : "";
         return medicalReportRepository.searchReports(cleanQuery, patientId, doctorId, reportType, status, pageable)
                 .map(medicalRecordService::mapToReportResponse);
     }
