@@ -104,7 +104,8 @@ public class BillingService {
             Long patientId,
             InvoiceStatus status,
             Pageable pageable) {
-        return invoiceRepository.searchInvoices(query, patientId, status, pageable)
+        String cleanQuery = (query != null && !query.trim().isEmpty()) ? query.trim() : "";
+        return invoiceRepository.searchInvoices(cleanQuery, patientId, status, pageable)
                 .map(this::mapToInvoiceDto);
     }
 
@@ -468,7 +469,8 @@ public class BillingService {
             PaymentMethod paymentMethod,
             BillingPaymentStatus status,
             Pageable pageable) {
-        return paymentRepository.searchPayments(query, invoiceId, patientId, paymentMethod, status, pageable)
+        String cleanQuery = (query != null && !query.trim().isEmpty()) ? query.trim() : "";
+        return paymentRepository.searchPayments(cleanQuery, invoiceId, patientId, paymentMethod, status, pageable)
                 .map(this::mapToPaymentDto);
     }
 
