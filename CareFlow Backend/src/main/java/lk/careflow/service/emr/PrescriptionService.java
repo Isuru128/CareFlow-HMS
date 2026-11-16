@@ -51,7 +51,7 @@ public class PrescriptionService {
             Long doctorId,
             PrescriptionStatus status,
             Pageable pageable) {
-        String cleanQuery = (query != null && !query.trim().isEmpty()) ? query.trim() : null;
+        String cleanQuery = (query != null && !query.trim().isEmpty()) ? query.trim() : "";
         return prescriptionRepository.searchPrescriptions(cleanQuery, patientId, doctorId, status, pageable)
                 .map(medicalRecordService::mapToPrescriptionResponse);
     }

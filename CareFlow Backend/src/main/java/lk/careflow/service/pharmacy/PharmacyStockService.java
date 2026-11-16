@@ -44,7 +44,8 @@ public class PharmacyStockService {
             Long medicineId,
             BatchStatus status,
             Pageable pageable) {
-        return medicineBatchRepository.searchBatches(query, medicineId, status, pageable)
+        String cleanQuery = (query != null && !query.trim().isEmpty()) ? query.trim() : "";
+        return medicineBatchRepository.searchBatches(cleanQuery, medicineId, status, pageable)
                 .map(this::mapToBatchDto);
     }
 
@@ -238,7 +239,8 @@ public class PharmacyStockService {
             Long medicineId,
             StockTransactionType transactionType,
             Pageable pageable) {
-        return stockTransactionRepository.searchTransactions(query, medicineId, transactionType, pageable)
+        String cleanQuery = (query != null && !query.trim().isEmpty()) ? query.trim() : "";
+        return stockTransactionRepository.searchTransactions(cleanQuery, medicineId, transactionType, pageable)
                 .map(this::mapToTransactionDto);
     }
 

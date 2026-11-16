@@ -37,7 +37,7 @@ public class LabReportService {
 
     @Transactional(readOnly = true)
     public Page<LabReportResponse> searchReports(String query, Pageable pageable) {
-        String cleanQuery = (query != null && !query.trim().isEmpty()) ? query.trim() : null;
+        String cleanQuery = (query != null && !query.trim().isEmpty()) ? query.trim() : "";
         return labReportRepository.searchReports(cleanQuery, pageable)
                 .map(this::mapToResponse);
     }

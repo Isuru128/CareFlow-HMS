@@ -36,8 +36,8 @@ public class DoctorService {
 
     @Transactional(readOnly = true)
     public Page<DoctorResponse> searchDoctors(String query, Long departmentId, String specialization, DoctorStatus status, Pageable pageable) {
-        String cleanQuery = (query != null && !query.trim().isEmpty()) ? query.trim() : null;
-        String cleanSpec = (specialization != null && !specialization.trim().isEmpty()) ? specialization.trim() : null;
+        String cleanQuery = (query != null && !query.trim().isEmpty()) ? query.trim() : "";
+        String cleanSpec = (specialization != null && !specialization.trim().isEmpty()) ? specialization.trim() : "";
 
         return doctorRepository.searchDoctors(cleanQuery, departmentId, cleanSpec, status, pageable)
                 .map(this::mapToDoctorResponse);

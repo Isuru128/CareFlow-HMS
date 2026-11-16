@@ -39,7 +39,8 @@ public class MedicineService {
             DosageForm dosageForm,
             Boolean isActive,
             Pageable pageable) {
-        return medicineRepository.searchMedicines(query, category, dosageForm, isActive, pageable)
+        String cleanQuery = (query != null && !query.trim().isEmpty()) ? query.trim() : "";
+        return medicineRepository.searchMedicines(cleanQuery, category, dosageForm, isActive, pageable)
                 .map(this::mapToDto);
     }
 

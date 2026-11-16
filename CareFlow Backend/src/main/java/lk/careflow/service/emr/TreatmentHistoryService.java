@@ -30,142 +30,150 @@ import java.util.stream.Collectors;
 @RequiredArgsConstructor
 public class TreatmentHistoryService {
 
-    private final TreatmentHistoryRepository treatmentHistoryRepository;
-    private final MedicalRecordRepository medicalRecordRepository;
-    private final PatientRepository patientRepository;
-    private final DoctorRepository doctorRepository;
-    private final MedicalRecordService medicalRecordService;
-    private final AuditLogService auditLogService;
+        private final TreatmentHistoryRepository treatmentHistoryRepository;
+        private final MedicalRecordRepository medicalRecordRepository;
+        private final PatientRepository patientRepository;
+        private final DoctorRepository doctorRepository;
+        private final MedicalRecordService medicalRecordService;
+        private final AuditLogService auditLogService;
 
-    @Transactional(readOnly = true)
-    public Page<TreatmentHistoryResponse> searchTreatments(
-            String query,
-            Long patientId,
-            TreatmentCategory category,
-            TreatmentStatus status,
-            Pageable pageable) {
-        String cleanQuery = (query != null && !query.trim().isEmpty()) ? query.trim() : null;
-        return treatmentHistoryRepository.searchTreatments(cleanQuery, patientId, category, status, pageable)
-                .map(medicalRecordService::mapToTreatmentResponse);
-    }
-
-    @Transactional(readOnly = true)
-    public List<TreatmentHistoryResponse> getTreatmentsByPatient(Long patientId) {
-        return treatmentHistoryRepository.findByPatientIdOrderByStartDateDesc(patientId)
-                .stream()
-                .map(medicalRecordService::mapToTreatmentResponse)
-                .collect(Collectors.toList());
-    }
-
-    @Transactional(readOnly = true)
-    public TreatmentHistoryResponse getTreatmentById(Long id) {
-        TreatmentHistory treatment = treatmentHistoryRepository.findById(id)
-                .orElseThrow(() -> new ResourceNotFoundException("TreatmentHistory", "id", id));
-        return medicalRecordService.mapToTreatmentResponse(treatment);
-    }
-
-    @Transactional
-    public TreatmentHistoryResponse addTreatment(
-            CreateTreatmentHistoryRequest request,
-            User currentUser,
-            HttpServletRequest httpRequest) {
-
-        Patient patient = patientRepository.findById(request.getPatientId())
-                .orElseThrow(() -> new ResourceNotFoundException("Patient", "id", request.getPatientId()));
-
-        Doctor doctor = null;
-        if (request.getDoctorId() != null) {
-            doctor = doctorRepository.findById(request.getDoctorId())
-                    .orElseThrow(() -> new ResourceNotFoundException("Doctor", "id", request.getDoctorId()));
+        @Transactional(readOnly = true)
+        public Page<TreatmentHistoryResponse> searchTreatments(
+                        String query,
+                        Long patientId,
+                        TreatmentCategory category,
+                        TreatmentStatus status,
+                        Pageable pageable) {
+                String cleanQuery = (query != null && !query.trim().isEmpty()) ? query.trim() : "";
+                return treatmentHistoryRepository.searchTreatments(cleanQuery, patientId, category, status, pageable)
+                                .map(medicalRecordService::mapToTreatmentResponse);
         }
 
-        MedicalRecord record = null;
-        if (request.getMedicalRecordId() != null) {
-            record = medicalRecordRepository.findById(request.getMedicalRecordId())
-                    .orElseThrow(() -> new ResourceNotFoundException("MedicalRecord", "id", request.getMedicalRecordId()));
+        @Transactional(readOnly = true)
+        public List<TreatmentHistoryResponse> getTreatmentsByPatient(Long patientId) {
+                return treatmentHistoryRepository.findByPatientIdOrderByStartDateDesc(patientId)
+                                .stream()
+                                .map(medicalRecordService::mapToTreatmentResponse)
+                                .collect(Collectors.toList());
         }
 
-        TreatmentHistory treatment = TreatmentHistory.builder()
-                .patient(patient)
-                .medicalRecord(record)
-                .doctor(doctor)
-                .treatmentName(request.getTreatmentName().trim())
-                .category(request.getCategory() != null ? request.getCategory() : TreatmentCategory.MEDICATION_THERAPY)
-                .startDate(request.getStartDate())
-                .endDate(request.getEndDate())
-                .status(request.getStatus() != null ? request.getStatus() : TreatmentStatus.IN_PROGRESS)
-                .outcome(request.getOutcome())
-                .procedureNotes(request.getProcedureNotes())
-                .complications(request.getComplications())
-                .build();
-
-        TreatmentHistory saved = treatmentHistoryRepository.save(treatment);
-
-        auditLogService.log(
-                currentUser,
-                "TREATMENT_HISTORY_ADDED",
-                "TREATMENT_HISTORY",
-                String.valueOf(saved.getId()),
-                "Added treatment: " + saved.getTreatmentName() + " for patient " + patient.getPatientNumber(),
-                httpRequest
-        );
-
-        return medicalRecordService.mapToTreatmentResponse(saved);
-    }
-
-    @Transactional
-    public TreatmentHistoryResponse updateTreatment(
-            Long id,
-            UpdateTreatmentHistoryRequest request,
-            User currentUser,
-            HttpServletRequest httpRequest) {
-
-        TreatmentHistory treatment = treatmentHistoryRepository.findById(id)
-                .orElseThrow(() -> new ResourceNotFoundException("TreatmentHistory", "id", id));
-
-        if (request.getDoctorId() != null) {
-            Doctor doctor = doctorRepository.findById(request.getDoctorId())
-                    .orElseThrow(() -> new ResourceNotFoundException("Doctor", "id", request.getDoctorId()));
-            treatment.setDoctor(doctor);
+        @Transactional(readOnly = true)
+        public TreatmentHistoryResponse getTreatmentById(Long id) {
+                TreatmentHistory treatment = treatmentHistoryRepository.findById(id)
+                                .orElseThrow(() -> new ResourceNotFoundException("TreatmentHistory", "id", id));
+                return medicalRecordService.mapToTreatmentResponse(treatment);
         }
 
-        treatment.setTreatmentName(request.getTreatmentName().trim());
-        if (request.getCategory() != null) treatment.setCategory(request.getCategory());
-        if (request.getStartDate() != null) treatment.setStartDate(request.getStartDate());
-        if (request.getEndDate() != null) treatment.setEndDate(request.getEndDate());
-        if (request.getStatus() != null) treatment.setStatus(request.getStatus());
-        if (request.getOutcome() != null) treatment.setOutcome(request.getOutcome());
-        treatment.setProcedureNotes(request.getProcedureNotes());
-        treatment.setComplications(request.getComplications());
+        @Transactional
+        public TreatmentHistoryResponse addTreatment(
+                        CreateTreatmentHistoryRequest request,
+                        User currentUser,
+                        HttpServletRequest httpRequest) {
 
-        TreatmentHistory saved = treatmentHistoryRepository.save(treatment);
+                Patient patient = patientRepository.findById(request.getPatientId())
+                                .orElseThrow(() -> new ResourceNotFoundException("Patient", "id",
+                                                request.getPatientId()));
 
-        auditLogService.log(
-                currentUser,
-                "TREATMENT_HISTORY_UPDATED",
-                "TREATMENT_HISTORY",
-                String.valueOf(saved.getId()),
-                "Updated treatment: " + saved.getTreatmentName(),
-                httpRequest
-        );
+                Doctor doctor = null;
+                if (request.getDoctorId() != null) {
+                        doctor = doctorRepository.findById(request.getDoctorId())
+                                        .orElseThrow(() -> new ResourceNotFoundException("Doctor", "id",
+                                                        request.getDoctorId()));
+                }
 
-        return medicalRecordService.mapToTreatmentResponse(saved);
-    }
+                MedicalRecord record = null;
+                if (request.getMedicalRecordId() != null) {
+                        record = medicalRecordRepository.findById(request.getMedicalRecordId())
+                                        .orElseThrow(() -> new ResourceNotFoundException("MedicalRecord", "id",
+                                                        request.getMedicalRecordId()));
+                }
 
-    @Transactional
-    public void deleteTreatment(Long id, User currentUser, HttpServletRequest httpRequest) {
-        TreatmentHistory treatment = treatmentHistoryRepository.findById(id)
-                .orElseThrow(() -> new ResourceNotFoundException("TreatmentHistory", "id", id));
+                TreatmentHistory treatment = TreatmentHistory.builder()
+                                .patient(patient)
+                                .medicalRecord(record)
+                                .doctor(doctor)
+                                .treatmentName(request.getTreatmentName().trim())
+                                .category(request.getCategory() != null ? request.getCategory()
+                                                : TreatmentCategory.MEDICATION_THERAPY)
+                                .startDate(request.getStartDate())
+                                .endDate(request.getEndDate())
+                                .status(request.getStatus() != null ? request.getStatus() : TreatmentStatus.IN_PROGRESS)
+                                .outcome(request.getOutcome())
+                                .procedureNotes(request.getProcedureNotes())
+                                .complications(request.getComplications())
+                                .build();
 
-        treatmentHistoryRepository.delete(treatment);
+                TreatmentHistory saved = treatmentHistoryRepository.save(treatment);
 
-        auditLogService.log(
-                currentUser,
-                "TREATMENT_HISTORY_DELETED",
-                "TREATMENT_HISTORY",
-                String.valueOf(id),
-                "Deleted treatment: " + treatment.getTreatmentName(),
-                httpRequest
-        );
-    }
+                auditLogService.log(
+                                currentUser,
+                                "TREATMENT_HISTORY_ADDED",
+                                "TREATMENT_HISTORY",
+                                String.valueOf(saved.getId()),
+                                "Added treatment: " + saved.getTreatmentName() + " for patient "
+                                                + patient.getPatientNumber(),
+                                httpRequest);
+
+                return medicalRecordService.mapToTreatmentResponse(saved);
+        }
+
+        @Transactional
+        public TreatmentHistoryResponse updateTreatment(
+                        Long id,
+                        UpdateTreatmentHistoryRequest request,
+                        User currentUser,
+                        HttpServletRequest httpRequest) {
+
+                TreatmentHistory treatment = treatmentHistoryRepository.findById(id)
+                                .orElseThrow(() -> new ResourceNotFoundException("TreatmentHistory", "id", id));
+
+                if (request.getDoctorId() != null) {
+                        Doctor doctor = doctorRepository.findById(request.getDoctorId())
+                                        .orElseThrow(() -> new ResourceNotFoundException("Doctor", "id",
+                                                        request.getDoctorId()));
+                        treatment.setDoctor(doctor);
+                }
+
+                treatment.setTreatmentName(request.getTreatmentName().trim());
+                if (request.getCategory() != null)
+                        treatment.setCategory(request.getCategory());
+                if (request.getStartDate() != null)
+                        treatment.setStartDate(request.getStartDate());
+                if (request.getEndDate() != null)
+                        treatment.setEndDate(request.getEndDate());
+                if (request.getStatus() != null)
+                        treatment.setStatus(request.getStatus());
+                if (request.getOutcome() != null)
+                        treatment.setOutcome(request.getOutcome());
+                treatment.setProcedureNotes(request.getProcedureNotes());
+                treatment.setComplications(request.getComplications());
+
+                TreatmentHistory saved = treatmentHistoryRepository.save(treatment);
+
+                auditLogService.log(
+                                currentUser,
+                                "TREATMENT_HISTORY_UPDATED",
+                                "TREATMENT_HISTORY",
+                                String.valueOf(saved.getId()),
+                                "Updated treatment: " + saved.getTreatmentName(),
+                                httpRequest);
+
+                return medicalRecordService.mapToTreatmentResponse(saved);
+        }
+
+        @Transactional
+        public void deleteTreatment(Long id, User currentUser, HttpServletRequest httpRequest) {
+                TreatmentHistory treatment = treatmentHistoryRepository.findById(id)
+                                .orElseThrow(() -> new ResourceNotFoundException("TreatmentHistory", "id", id));
+
+                treatmentHistoryRepository.delete(treatment);
+
+                auditLogService.log(
+                                currentUser,
+                                "TREATMENT_HISTORY_DELETED",
+                                "TREATMENT_HISTORY",
+                                String.valueOf(id),
+                                "Deleted treatment: " + treatment.getTreatmentName(),
+                                httpRequest);
+        }
 }

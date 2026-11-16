@@ -595,7 +595,8 @@ public class ReportService {
             ReportCategory category,
             ReportStatus status,
             Pageable pageable) {
-        return reportRepository.searchReports(query, category, status, pageable)
+        String cleanQuery = (query != null && !query.trim().isEmpty()) ? query.trim() : "";
+        return reportRepository.searchReports(cleanQuery, category, status, pageable)
                 .map(this::mapToReportDto);
     }
 

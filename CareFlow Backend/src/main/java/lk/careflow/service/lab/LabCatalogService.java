@@ -28,7 +28,7 @@ public class LabCatalogService {
 
     @Transactional(readOnly = true)
     public Page<LabTestDto> searchTests(String query, LabCategory category, Boolean isActive, Pageable pageable) {
-        String cleanQuery = (query != null && !query.trim().isEmpty()) ? query.trim() : null;
+        String cleanQuery = (query != null && !query.trim().isEmpty()) ? query.trim() : "";
         return labTestRepository.searchTests(cleanQuery, category, isActive, pageable)
                 .map(this::mapToDto);
     }
