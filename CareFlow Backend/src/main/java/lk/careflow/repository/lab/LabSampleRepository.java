@@ -27,7 +27,7 @@ public interface LabSampleRepository extends JpaRepository<LabSample, Long> {
            "JOIN s.request r " +
            "JOIN r.patient p " +
            "WHERE (:status IS NULL OR s.status = :status) AND " +
-           "(:query IS NULL OR (" +
+           "(:query IS NULL OR :query = '' OR (" +
            "LOWER(s.sampleBarcode) LIKE LOWER(CONCAT('%', :query, '%')) OR " +
            "LOWER(r.requestNumber) LIKE LOWER(CONCAT('%', :query, '%')) OR " +
            "LOWER(p.patientNumber) LIKE LOWER(CONCAT('%', :query, '%')) OR " +
