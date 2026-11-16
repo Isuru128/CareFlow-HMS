@@ -113,8 +113,9 @@ public class StaffService {
             ShiftType shiftType,
             StaffStatus status,
             Pageable pageable) {
+        String cleanQuery = (query != null && !query.trim().isEmpty()) ? query.trim() : "";
         return employeeRepository.searchEmployees(
-                query, departmentId, roleCategory, employmentType, shiftType, status, pageable
+                cleanQuery, departmentId, roleCategory, employmentType, shiftType, status, pageable
         ).map(this::mapToEmployeeDto);
     }
 
@@ -340,8 +341,9 @@ public class StaffService {
             AttendanceStatus status,
             ShiftType shiftType,
             Pageable pageable) {
+        String cleanQuery = (query != null && !query.trim().isEmpty()) ? query.trim() : "";
         return attendanceRepository.searchAttendance(
-                query, employeeId, departmentId, attendanceDate, status, shiftType, pageable
+                cleanQuery, employeeId, departmentId, attendanceDate, status, shiftType, pageable
         ).map(this::mapToAttendanceDto);
     }
 
@@ -519,8 +521,9 @@ public class StaffService {
             Long departmentId,
             DepartmentAssignmentType assignmentType,
             Pageable pageable) {
+        String cleanQuery = (query != null && !query.trim().isEmpty()) ? query.trim() : "";
         return assignmentRepository.searchAssignments(
-                query, employeeId, departmentId, assignmentType, pageable
+                cleanQuery, employeeId, departmentId, assignmentType, pageable
         ).map(this::mapToAssignmentDto);
     }
 
@@ -601,8 +604,9 @@ public class StaffService {
             LeaveType leaveType,
             LeaveStatus status,
             Pageable pageable) {
+        String cleanQuery = (query != null && !query.trim().isEmpty()) ? query.trim() : "";
         return leaveRepository.searchLeaves(
-                query, employeeId, departmentId, leaveType, status, pageable
+                cleanQuery, employeeId, departmentId, leaveType, status, pageable
         ).map(this::mapToLeaveDto);
     }
 
