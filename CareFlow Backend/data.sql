@@ -67,6 +67,24 @@ VALUES (
 )
 ON CONFLICT (patient_number) DO NOTHING;
 
+INSERT INTO patient_medical_history (
+    patient_id, condition_or_diagnosis, diagnosis_date, treatment, surgeries, medications, notes
+)
+SELECT
+    p.id,
+    'Essential Hypertension (Stage 1)',
+    '2024-06-15',
+    'Antihypertensive therapy & DASH diet',
+    'None',
+    'Amlodipine 5mg OD, Aspirin 75mg ON',
+    'Controlled blood pressure on routine outpatient cardiology follow-up.'
+FROM patients p
+WHERE p.patient_number = 'PAT-10001'
+  AND NOT EXISTS (
+      SELECT 1 FROM patient_medical_history pmh
+      WHERE pmh.patient_id = p.id AND pmh.condition_or_diagnosis = 'Essential Hypertension (Stage 1)'
+  );
+
 
 -- ==============================================================================
 -- Module 3.3 & 3.4 - Doctor & Appointment Management Seed Data
