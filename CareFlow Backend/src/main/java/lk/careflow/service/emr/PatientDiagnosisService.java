@@ -44,7 +44,7 @@ public class PatientDiagnosisService {
             Long patientId,
             DiagnosisStatus status,
             Pageable pageable) {
-        String cleanQuery = (query != null && !query.trim().isEmpty()) ? query.trim() : null;
+        String cleanQuery = (query != null && !query.trim().isEmpty()) ? query.trim() : "";
         return diagnosisRepository.searchDiagnoses(cleanQuery, patientId, status, pageable)
                 .map(medicalRecordService::mapToDiagnosisResponse);
     }
