@@ -54,8 +54,8 @@ public interface AppointmentRepository extends JpaRepository<Appointment, Long> 
             "(:patientId IS NULL OR a.patient.id = :patientId) AND " +
             "(:departmentId IS NULL OR a.department.id = :departmentId) AND " +
             "(:status IS NULL OR a.status = :status) AND " +
-            "(:startDate IS NULL OR a.appointmentDate >= :startDate) AND " +
-            "(:endDate IS NULL OR a.appointmentDate <= :endDate)")
+            "a.appointmentDate >= :startDate AND " +
+            "a.appointmentDate <= :endDate")
     Page<Appointment> searchAppointments(
             @Param("query") String query,
             @Param("doctorId") Long doctorId,
