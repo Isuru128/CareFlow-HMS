@@ -30,8 +30,8 @@ public interface MedicalRecordRepository extends JpaRepository<MedicalRecord, Lo
            "(:patientId IS NULL OR r.patient.id = :patientId) AND " +
            "(:doctorId IS NULL OR r.doctor.id = :doctorId) AND " +
            "(:status IS NULL OR r.status = :status) AND " +
-           "(:startDate IS NULL OR r.visitDate >= :startDate) AND " +
-           "(:endDate IS NULL OR r.visitDate <= :endDate) AND " +
+           "r.visitDate >= :startDate AND " +
+           "r.visitDate <= :endDate AND " +
            "(:query IS NULL OR :query = '' OR " +
            " LOWER(r.recordNumber) LIKE LOWER(CONCAT('%', :query, '%')) OR " +
            " LOWER(r.patient.firstName) LIKE LOWER(CONCAT('%', :query, '%')) OR " +
