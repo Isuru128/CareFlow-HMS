@@ -47,7 +47,8 @@ public class AdmissionService {
             AdmissionStatus status,
             RoomType roomType,
             Pageable pageable) {
-        return admissionRepository.searchAdmissions(query, patientId, status, roomType, pageable)
+        String cleanQuery = (query != null && !query.trim().isEmpty()) ? query.trim() : "";
+        return admissionRepository.searchAdmissions(cleanQuery, patientId, status, roomType, pageable)
                 .map(this::mapToDto);
     }
 
