@@ -37,7 +37,7 @@ apiClient.interceptors.response.use(
       if (refreshToken) {
         try {
           const res = await axios.post(
-            `${import.meta.env.VITE_API_BASE_URL || '/api'}/auth/refresh-token`,
+            `${rawBaseURL.replace(/\/+$/, '')}/auth/refresh-token`,
             { refreshToken }
           )
           const { accessToken } = res.data

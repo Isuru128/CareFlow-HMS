@@ -47,7 +47,7 @@ public interface MedicineBatchRepository extends JpaRepository<MedicineBatch, Lo
     @Query("SELECT b FROM MedicineBatch b WHERE " +
            "(:medicineId IS NULL OR b.medicine.id = :medicineId) AND " +
            "(:status IS NULL OR b.status = :status) AND " +
-           "(:query IS NULL OR (" +
+           "(:query IS NULL OR :query = '' OR (" +
            "LOWER(b.batchNumber) LIKE LOWER(CONCAT('%', :query, '%')) OR " +
            "LOWER(b.supplierName) LIKE LOWER(CONCAT('%', :query, '%')) OR " +
            "LOWER(b.medicine.name) LIKE LOWER(CONCAT('%', :query, '%'))))")

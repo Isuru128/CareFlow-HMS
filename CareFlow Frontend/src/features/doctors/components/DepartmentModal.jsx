@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react'
 import { doctorApi } from '../api/doctorApi'
+import { validateDepartmentForm, normalizePhoneTo10Digits } from '../../../utils/validation'
 import { X, Building2, Plus, Edit2, Trash2, Loader2, AlertCircle, CheckCircle2 } from 'lucide-react'
 
 export default function DepartmentModal({ isOpen, onClose, onUpdated }) {
@@ -89,18 +90,26 @@ export default function DepartmentModal({ isOpen, onClose, onUpdated }) {
     setError('')
     setSuccess('')
 
-    if (!formData.name.trim() || !formData.code.trim()) {
-      setError('Name and unique code are required.')
+    const validationError = validateDepartmentForm(formData)
+    if (validationError) {
+      setError(validationError)
       return
+    }
+
+    const payload = {
+      ...formData,
+      name: formData.name.trim(),
+      code: formData.code.trim().toUpperCase(),
+      contactNumber: formData.contactNumber?.trim() ? normalizePhoneTo10Digits(formData.contactNumber) : ''
     }
 
     setSubmitting(true)
     try {
       if (isEditing) {
-        await doctorApi.updateDepartment(editingId, formData)
+        await doctorApi.updateDepartment(editingId, payload)
         setSuccess('Department updated successfully!')
       } else {
-        await doctorApi.createDepartment(formData)
+        await doctorApi.createDepartment(payload)
         setSuccess('Department created successfully!')
       }
 

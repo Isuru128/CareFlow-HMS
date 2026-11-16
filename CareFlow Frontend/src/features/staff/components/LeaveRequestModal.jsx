@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react'
 import { staffApi } from '../api/staffApi'
+import { validatePhone, normalizePhoneTo10Digits } from '../../../utils/validation'
 import { X, CalendarOff, CheckCircle2, AlertCircle } from 'lucide-react'
 
 export default function LeaveRequestModal({
@@ -74,6 +75,15 @@ export default function LeaveRequestModal({
       setError('Leave end date must be on or after the start date.')
       return
     }
+    if (!formData.reason || formData.reason.trim().length < 3) {
+      setError('Reason for leave must be at least 3 characters.')
+      return
+    }
+    const phoneErr = validatePhone(formData.emergencyContact, 'Emergency contact number', false)
+    if (phoneErr) {
+      setError(phoneErr)
+      return
+    }
     try {
       setSubmitting(true)
       setError(null)
@@ -82,9 +92,11 @@ export default function LeaveRequestModal({
         leaveType: formData.leaveType,
         startDate: formData.startDate,
         endDate: formData.endDate,
-        reason: formData.reason,
+        reason: formData.reason.trim(),
         handoverNotes: formData.handoverNotes,
-        emergencyContact: formData.emergencyContact
+        emergencyContact: formData.emergencyContact?.trim()
+          ? normalizePhoneTo10Digits(formData.emergencyContact)
+          : ''
       })
       onSuccess()
       onClose()
